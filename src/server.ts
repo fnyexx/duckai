@@ -68,6 +68,8 @@ const server = Bun.serve({
           error: {
             message: "Not found",
             type: "invalid_request_error",
+            param: null,
+            code: null,
           },
         }),
         {
@@ -81,7 +83,12 @@ const server = Bun.serve({
       const errorMessage =
         error instanceof Error ? error.message : "Internal server error";
       const statusCode =
-        errorMessage.includes("required") || errorMessage.includes("must")
+        errorMessage.includes("required") ||
+        errorMessage.includes("must") ||
+        errorMessage.includes("unsupported") ||
+        errorMessage.includes("invalid") ||
+        errorMessage.includes("should") ||
+        errorMessage.includes("cannot")
           ? 400
           : 500;
 
@@ -93,6 +100,8 @@ const server = Bun.serve({
               statusCode === 400
                 ? "invalid_request_error"
                 : "internal_server_error",
+            param: null,
+            code: null,
           },
         }),
         {

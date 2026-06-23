@@ -8,6 +8,9 @@ import type {
   ModelsResponse,
   Model,
   DuckAIRequest,
+  DuckAIMessage,
+  ContentPart,
+  TextPart,
   ToolDefinition,
   ToolCall,
 } from "./types";
@@ -69,15 +72,51 @@ export class OpenAIService {
     return Math.ceil(text.length / 4);
   }
 
+  private extractTextFromContent(
+    content: string | ContentPart[] | null | undefined
+  ): string {
+    if (!content) {
+      return "";
+    }
+    if (typeof content === "string") {
+      return content;
+    }
+    if (Array.isArray(content)) {
+      return content
+        .filter((part): part is TextPart => part.type === "text")
+        .map((part) => part.text)
+        .join("\n");
+    }
+    return "";
+  }
+
   private transformToDuckAIRequest(
     request: ChatCompletionRequest
   ): DuckAIRequest {
-    // Use the model from request, fallback to default
-    const model = request.model || "gpt-5.4-mini";
+    const modelMap: Record<string, string> = {
+      "gpt-4o": "gpt-5.4-mini",
+      "gpt-4o-mini": "gpt-5.4-mini",
+      "gpt-4-turbo": "gpt-5.4-mini",
+      "gpt-4": "gpt-5.4-mini",
+      "gpt-3.5-turbo": "gpt-5.4-mini",
+      "claude-3-5-sonnet": "claude-haiku-4-5",
+      "claude-3-opus": "claude-haiku-4-5",
+    };
+
+    const requestedModel = request.model || "gpt-5.4-mini";
+    const targetModel = modelMap[requestedModel] || requestedModel;
+
+    const duckAIMessages: DuckAIMessage[] = request.messages.map((m) => ({
+      role: m.role,
+      content: this.extractTextFromContent(m.content),
+      name: m.name,
+      tool_calls: m.tool_calls,
+      tool_call_id: m.tool_call_id,
+    }));
 
     return {
-      model,
-      messages: request.messages,
+      model: targetModel,
+      messages: duckAIMessages,
     };
   }
 
@@ -101,7 +140,7 @@ export class OpenAIService {
     const created = this.getCurrentTimestamp();
 
     // Calculate token usage
-    const promptText = request.messages.map((m) => m.content || "").join(" ");
+    const promptText = request.messages.map((m) => this.extractTextFromContent(m.content)).join(" ");
     const promptTokens = this.estimateTokens(promptText);
     const completionTokens = this.estimateTokens(response);
 
@@ -173,7 +212,7 @@ Please follow these instructions when responding to the following user message.`
       if (toolCalls.length > 0) {
         // Calculate token usage
         const promptText = modifiedMessages
-          .map((m) => m.content || "")
+          .map((m) => this.extractTextFromContent(m.content))
           .join(" ");
         const promptTokens = this.estimateTokens(promptText);
         const completionTokens = this.estimateTokens(response);
@@ -214,7 +253,7 @@ Please follow these instructions when responding to the following user message.`
     ) {
       // Get user message for argument extraction
       const userMessage = request.messages[request.messages.length - 1];
-      const userContent = userMessage.content || "";
+      const userContent = this.extractTextFromContent(userMessage.content);
 
       // Determine which function to call
       let functionToCall: string;
@@ -277,7 +316,7 @@ Please follow these instructions when responding to the following user message.`
         },
       };
 
-      const promptText = modifiedMessages.map((m) => m.content || "").join(" ");
+      const promptText = modifiedMessages.map((m) => this.extractTextFromContent(m.content)).join(" ");
       const promptTokens = this.estimateTokens(promptText);
       const completionTokens = this.estimateTokens(
         JSON.stringify(forcedToolCall)
@@ -308,7 +347,7 @@ Please follow these instructions when responding to the following user message.`
     }
 
     // No function calls detected, return normal response
-    const promptText = modifiedMessages.map((m) => m.content || "").join(" ");
+    const promptText = modifiedMessages.map((m) => this.extractTextFromContent(m.content)).join(" ");
     const promptTokens = this.estimateTokens(promptText);
     const completionTokens = this.estimateTokens(response);
 
@@ -386,6 +425,27 @@ Please follow these instructions when responding to the following user message.`
               return;
             }
 
+            if (isFirst) {
+              // 1. Send first chunk containing only role
+              const firstChunk: ChatCompletionStreamResponse = {
+                id,
+                object: "chat.completion.chunk",
+                created,
+                model: request.model,
+                choices: [
+                  {
+                    index: 0,
+                    delta: { role: "assistant" },
+                    finish_reason: null,
+                  },
+                ],
+              };
+              const firstData = `data: ${JSON.stringify(firstChunk)}\n\n`;
+              controller.enqueue(new TextEncoder().encode(firstData));
+              isFirst = false;
+            }
+
+            // 2. Send chunk containing content
             const chunk: ChatCompletionStreamResponse = {
               id,
               object: "chat.completion.chunk",
@@ -394,15 +454,12 @@ Please follow these instructions when responding to the following user message.`
               choices: [
                 {
                   index: 0,
-                  delta: isFirst
-                    ? { role: "assistant", content: value }
-                    : { content: value },
+                  delta: { content: value },
                   finish_reason: null,
                 },
               ],
             };
 
-            isFirst = false;
             const data = `data: ${JSON.stringify(chunk)}\n\n`;
             controller.enqueue(new TextEncoder().encode(data));
 
@@ -430,6 +487,24 @@ Please follow these instructions when responding to the following user message.`
         const choice = completion.choices[0];
 
         if (choice.message.tool_calls) {
+          // Send role first
+          const roleChunk: ChatCompletionStreamResponse = {
+            id,
+            object: "chat.completion.chunk",
+            created,
+            model: request.model,
+            choices: [
+              {
+                index: 0,
+                delta: { role: "assistant" },
+                finish_reason: null,
+              },
+            ],
+          };
+
+          const roleData = `data: ${JSON.stringify(roleChunk)}\n\n`;
+          controller.enqueue(new TextEncoder().encode(roleData));
+
           // Stream tool calls
           const toolCallsChunk: ChatCompletionStreamResponse = {
             id,
@@ -440,7 +515,6 @@ Please follow these instructions when responding to the following user message.`
               {
                 index: 0,
                 delta: {
-                  role: "assistant",
                   tool_calls: choice.message.tool_calls,
                 },
                 finish_reason: null,
@@ -473,7 +547,7 @@ Please follow these instructions when responding to the following user message.`
           controller.enqueue(new TextEncoder().encode(finalDone));
         } else {
           // Stream regular content
-          const content = choice.message.content || "";
+          const content = this.extractTextFromContent(choice.message.content);
 
           // Send role first
           const roleChunk: ChatCompletionStreamResponse = {
@@ -588,12 +662,43 @@ Please follow these instructions when responding to the following user message.`
           throw new Error("Tool messages must have content as a string");
         }
       } else {
-        // For non-tool messages, content can be null if there are tool_calls
+        if (message.content === undefined) {
+          throw new Error("Each message must have content");
+        }
+
         if (
-          message.content === undefined ||
-          (message.content !== null && typeof message.content !== "string")
+          message.content !== null &&
+          typeof message.content !== "string" &&
+          !Array.isArray(message.content)
         ) {
-          throw new Error("Each message must have content as a string or null");
+          throw new Error("Each message must have content as a string, array, or null");
+        }
+
+        if (Array.isArray(message.content)) {
+          for (const part of message.content) {
+            if (typeof part !== "object" || part === null) {
+              throw new Error("Content parts must be objects");
+            }
+            if (!("type" in part)) {
+              throw new Error("Each content part must have a type");
+            }
+            if (part.type !== "text" && part.type !== "image_url") {
+              throw new Error(`Unsupported content part type: ${part.type}`);
+            }
+            if (part.type === "text") {
+              if (typeof part.text !== "string") {
+                throw new Error("Text content parts must have a text field of type string");
+              }
+            } else if (part.type === "image_url") {
+              if (
+                typeof part.image_url !== "object" ||
+                part.image_url === null ||
+                typeof part.image_url.url !== "string"
+              ) {
+                throw new Error("Image content parts must have an image_url object with a url field");
+              }
+            }
+          }
         }
       }
     }

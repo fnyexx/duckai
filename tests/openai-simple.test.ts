@@ -100,6 +100,16 @@ describe("OpenAI JavaScript Library - Core Tests", () => {
       expect(typeof completion.choices[0].message.content).toBe("string");
     });
 
+    it("should map common OpenAI models to DuckAI backend models", async () => {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: "Say hello" }],
+      });
+
+      expect(completion.object).toBe("chat.completion");
+      expect(completion.model).toBe("gpt-4o");
+    });
+
     it("should handle system messages", async () => {
       const completion = await openai.chat.completions.create({
         model: "gpt-5.4-mini",

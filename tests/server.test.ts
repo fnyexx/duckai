@@ -258,6 +258,8 @@ describe("OpenAI Compatible Server", () => {
       const data = await response.json();
       expect(data.error.message).toBe("Not found");
       expect(data.error.type).toBe("invalid_request_error");
+      expect(data.error.param).toBeNull();
+      expect(data.error.code).toBeNull();
     });
 
     it("should handle malformed JSON", async () => {

@@ -1,7 +1,22 @@
 // OpenAI API Types
+export interface TextPart {
+  type: "text";
+  text: string;
+}
+
+export interface ImageUrlPart {
+  type: "image_url";
+  image_url: {
+    url: string;
+    detail?: "auto" | "low" | "high";
+  };
+}
+
+export type ContentPart = TextPart | ImageUrlPart;
+
 export interface ChatCompletionMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
+  content: string | ContentPart[] | null;
   name?: string;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
@@ -106,7 +121,15 @@ export interface VQDResponse {
   hash: string;
 }
 
+export interface DuckAIMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  name?: string;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+}
+
 export interface DuckAIRequest {
   model: string;
-  messages: ChatCompletionMessage[];
+  messages: DuckAIMessage[];
 }
