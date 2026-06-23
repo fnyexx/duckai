@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import OpenAI from "openai";
 
+process.env.MOCK_DUCK_AI = "true";
+
 const BASE_URL = "http://localhost:3002";
 let server: any;
 let openai: OpenAI;
@@ -9,7 +11,7 @@ beforeAll(async () => {
   // Start the server for testing
   const { spawn } = require("child_process");
   server = spawn("bun", ["run", "src/server.ts"], {
-    env: { ...process.env, PORT: "3002" },
+    env: { ...process.env, PORT: "3002", MOCK_DUCK_AI: "true" },
     stdio: "pipe",
   });
 
@@ -40,9 +42,9 @@ describe("OpenAI JavaScript Library Compatibility", () => {
 
       // Check that we have expected models
       const modelIds = models.data.map((m) => m.id);
-      expect(modelIds).toContain("gpt-4o-mini");
-      expect(modelIds).toContain("claude-3-haiku-20240307");
-      expect(modelIds).toContain("mistralai/Mistral-Small-24B-Instruct-2501");
+      expect(modelIds).toContain("gpt-5.4-mini");
+      expect(modelIds).toContain("claude-haiku-4-5");
+      expect(modelIds).toContain("gpt-5.4-nano");
 
       // Check model structure
       const firstModel = models.data[0];
@@ -55,7 +57,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
   describe("Chat Completions API", () => {
     it("should create basic chat completion using OpenAI library", async () => {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           { role: "user", content: "Say 'Hello World' and nothing else" },
         ],
@@ -63,7 +65,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
       });
 
       expect(completion.object).toBe("chat.completion");
-      expect(completion.model).toBe("gpt-4o-mini");
+      expect(completion.model).toBe("gpt-5.4-mini");
       expect(completion.choices).toHaveLength(1);
 
       const choice = completion.choices[0];
@@ -84,8 +86,8 @@ describe("OpenAI JavaScript Library Compatibility", () => {
 
     it("should handle different models", async () => {
       const models = [
-        "gpt-4o-mini",
-        "claude-3-haiku-20240307",
+        "gpt-5.4-mini",
+        "claude-haiku-4-5",
         "mistralai/Mistral-Small-24B-Instruct-2501",
       ];
 
@@ -103,7 +105,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
 
     it("should handle system messages", async () => {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "system",
@@ -120,7 +122,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
 
     it("should handle conversation history", async () => {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           { role: "user", content: "My name is Alice" },
           { role: "assistant", content: "Hello Alice! Nice to meet you." },
@@ -134,7 +136,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
 
     it("should handle optional parameters", async () => {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Tell me a short joke" }],
         temperature: 0.7,
         max_tokens: 50,
@@ -149,7 +151,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
   describe("Streaming Chat Completions", () => {
     it("should create streaming chat completion using OpenAI library", async () => {
       const stream = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           { role: "user", content: "Count from 1 to 5, one number per line" },
         ],
@@ -163,7 +165,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
         chunks.push(chunk);
 
         expect(chunk.object).toBe("chat.completion.chunk");
-        expect(chunk.model).toBe("gpt-4o-mini");
+        expect(chunk.model).toBe("gpt-5.4-mini");
         expect(chunk.choices).toHaveLength(1);
 
         const choice = chunk.choices[0];
@@ -194,7 +196,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
 
     it("should handle streaming with different models", async () => {
       const stream = await openai.chat.completions.create({
-        model: "claude-3-haiku-20240307",
+        model: "claude-haiku-4-5",
         messages: [{ role: "user", content: "Say hello" }],
         stream: true,
       });
@@ -202,7 +204,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
       let chunkCount = 0;
       for await (const chunk of stream) {
         chunkCount++;
-        expect(chunk.model).toBe("claude-3-haiku-20240307");
+        expect(chunk.model).toBe("claude-haiku-4-5");
         expect(chunk.object).toBe("chat.completion.chunk");
 
         // Don't process too many chunks in test
@@ -236,7 +238,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
     it("should handle invalid requests properly", async () => {
       try {
         await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           messages: [] as any, // Invalid empty messages
         });
 
@@ -252,7 +254,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
     it("should handle malformed messages", async () => {
       try {
         await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           messages: [{ role: "invalid" as any, content: "test" }],
         });
 
@@ -269,7 +271,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
     it("should maintain conversation context", async () => {
       // First message
       const completion1 = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Remember this number: 42" }],
       });
 
@@ -277,7 +279,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
 
       // Follow-up message with context
       const completion2 = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           { role: "user", content: "Remember this number: 42" },
           {
@@ -294,7 +296,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
     it("should handle concurrent requests", async () => {
       const promises = Array.from({ length: 3 }, (_, i) =>
         openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           messages: [{ role: "user", content: `Say "Response ${i + 1}"` }],
         })
       );
@@ -322,7 +324,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
       ];
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages,
       });
 
@@ -336,7 +338,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
       const startTime = Date.now();
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Say hello" }],
       });
 
@@ -353,7 +355,7 @@ describe("OpenAI JavaScript Library Compatibility", () => {
         let firstChunkTime: number | null = null;
 
         const stream = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           messages: [{ role: "user", content: "Count to 3" }],
           stream: true,
         });

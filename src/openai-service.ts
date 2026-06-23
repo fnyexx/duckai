@@ -73,7 +73,7 @@ export class OpenAIService {
     request: ChatCompletionRequest
   ): DuckAIRequest {
     // Use the model from request, fallback to default
-    const model = request.model || "mistralai/Mistral-Small-24B-Instruct-2501";
+    const model = request.model || "gpt-5.4-mini";
 
     return {
       model,
@@ -607,7 +607,7 @@ Please follow these instructions when responding to the following user message.`
     }
 
     return {
-      model: request.model || "mistralai/Mistral-Small-24B-Instruct-2501",
+      model: request.model || "gpt-5.4-mini",
       messages: request.messages,
       temperature: request.temperature,
       max_tokens: request.max_tokens,

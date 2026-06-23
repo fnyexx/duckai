@@ -2,6 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import type { Server } from "bun";
 import { OpenAIService } from "../src/openai-service";
 
+process.env.MOCK_DUCK_AI = "true";
+
 describe("End-to-End Tool Calling Tests", () => {
   let server: Server;
   let baseUrl: string;
@@ -133,7 +135,7 @@ describe("End-to-End Tool Calling Tests", () => {
   describe("Function Calling API", () => {
     it("should handle basic function calling request", async () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "What time is it?" }],
         tools: [
           {
@@ -173,7 +175,7 @@ describe("End-to-End Tool Calling Tests", () => {
 
     it("should handle calculate function", async () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Calculate 15 + 27" }],
         tools: [
           {
@@ -218,7 +220,7 @@ describe("End-to-End Tool Calling Tests", () => {
 
     it("should handle weather function", async () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "user",
@@ -263,7 +265,7 @@ describe("End-to-End Tool Calling Tests", () => {
 
     it("should handle streaming with tools", async () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "What time is it?" }],
         tools: [
           {
@@ -312,7 +314,7 @@ describe("End-to-End Tool Calling Tests", () => {
 
     it("should reject invalid tool definitions", async () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Hello" }],
         tools: [
           {
@@ -339,7 +341,7 @@ describe("End-to-End Tool Calling Tests", () => {
 
     it("should handle tool_choice none", async () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "What time is it?" }],
         tools: [
           {
@@ -371,7 +373,7 @@ describe("End-to-End Tool Calling Tests", () => {
 
     it("should handle multi-turn conversation with tools", async () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           { role: "user", content: "What time is it?" },
           {
@@ -445,7 +447,7 @@ describe("End-to-End Tool Calling Tests", () => {
   describe("Error Handling", () => {
     it("should handle malformed tool messages", async () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "tool",
@@ -470,7 +472,7 @@ describe("End-to-End Tool Calling Tests", () => {
 
     it("should handle missing function parameters", async () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Hello" }],
         tools: [
           {

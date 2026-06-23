@@ -87,7 +87,7 @@ export class SharedRateLimitTester {
         const startTime = Date.now();
 
         const response = await this.duckAI.chat({
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           messages: [{ role: "user", content: `Shared test request ${i}` }],
         });
 

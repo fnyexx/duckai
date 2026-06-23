@@ -98,7 +98,7 @@ async function testOpenAICompatibility() {
     // Test 2: Basic chat completion
     console.log("2️⃣ Testing basic chat completion...");
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
       messages: [
         {
           role: "user",
@@ -117,7 +117,7 @@ async function testOpenAICompatibility() {
     // Test 3: Streaming chat completion
     console.log("3️⃣ Testing streaming chat completion...");
     const streamResponse = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
       messages: [
         { role: "user", content: "Count from 1 to 5, one number per line" },
       ],
@@ -159,7 +159,7 @@ async function testOpenAICompatibility() {
     // Test 4: Multi-turn conversation
     console.log("4️⃣ Testing multi-turn conversation...");
     const conversation = await openai.chat.completions.create({
-      model: "claude-3-haiku-20240307",
+      model: "claude-haiku-4-5",
       messages: [
         { role: "system", content: "You are a helpful math tutor." },
         { role: "user", content: "What is 2 + 2?" },

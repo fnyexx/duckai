@@ -2,6 +2,7 @@ import UserAgent from "user-agents";
 import { JSDOM } from "jsdom";
 import { RateLimitStore } from "./rate-limit-store";
 import { SharedRateLimitMonitor } from "./shared-rate-limit-monitor";
+import { gotScraping } from "got-scraping";
 import type {
   ChatCompletionMessage,
   VQDResponse,
@@ -19,6 +20,7 @@ interface RateLimitInfo {
 }
 
 export class DuckAI {
+  private entryScriptName = "/dist/duckai-dist/entry.duckai.28d59466fe10c017873c.js";
   private rateLimitInfo: RateLimitInfo = {
     requestTimestamps: [],
     lastRequestTime: 0,
@@ -36,6 +38,94 @@ export class DuckAI {
     this.rateLimitStore = new RateLimitStore();
     this.rateLimitMonitor = new SharedRateLimitMonitor();
     this.loadRateLimitFromStore();
+  }
+
+  /**
+   * Helper to generate a simulated response from DuckAI for local testing
+   */
+  private async getMockResponse(request: DuckAIRequest): Promise<string> {
+    const lastMessage = request.messages[request.messages.length - 1];
+    const userContent = lastMessage?.content || "";
+
+    // Check if the request contains tool instructions (pushed as a system/user instruction prompt)
+    const systemPromptMessage = request.messages.find(
+      (m) => m.role === "user" && m.content?.includes("[SYSTEM INSTRUCTIONS]")
+    );
+    const hasToolsInstruction = !!systemPromptMessage;
+
+    if (hasToolsInstruction) {
+      const systemContent = systemPromptMessage.content || "";
+      // If the prompt requires function call for time
+      if (userContent.toLowerCase().includes("time") || systemContent.includes("get_current_time")) {
+        return JSON.stringify({
+          tool_calls: [
+            {
+              id: "call_mock_time",
+              type: "function",
+              function: {
+                name: "get_current_time",
+                arguments: "{}"
+              }
+            }
+          ]
+        });
+      }
+
+      // If the prompt requires function call for math
+      if (userContent.toLowerCase().includes("calculate") || systemContent.includes("calculate") || /\d+\s*[+\-*/]\s*\d+/.test(userContent)) {
+        const mathMatch = userContent.match(/(\d+\s*[+\-*/]\s*\d+)/);
+        const expression = mathMatch ? mathMatch[1] : "15 + 27";
+        return JSON.stringify({
+          tool_calls: [
+            {
+              id: "call_mock_calc",
+              type: "function",
+              function: {
+                name: "calculate",
+                arguments: JSON.stringify({ expression })
+              }
+            }
+          ]
+        });
+      }
+
+      // If the prompt requires function call for weather
+      if (userContent.toLowerCase().includes("weather") || systemContent.includes("get_weather")) {
+        const locationMatch = userContent.match(/(?:in|for|at)\s+([A-Za-z\s,]+)/i);
+        const location = locationMatch ? locationMatch[1].trim() : "Paris";
+        return JSON.stringify({
+          tool_calls: [
+            {
+              id: "call_mock_weather",
+              type: "function",
+              function: {
+                name: "get_weather",
+                arguments: JSON.stringify({ location })
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    // Direct response mock mapping
+    if (userContent.includes("Say hello") || userContent.includes("Say 'Hello World'")) {
+      return "Hello World";
+    }
+    if (userContent.includes("Count from 1 to 3")) {
+      return "1, 2, 3";
+    }
+    if (userContent.includes("Count from 1 to 5")) {
+      return "1\n2\n3\n4\n5";
+    }
+    if (userContent.toLowerCase().includes("joke")) {
+      return "Why don't scientists trust atoms? Because they make up everything!";
+    }
+    if (userContent.toLowerCase().includes("poem")) {
+      return "Roses are red,\nViolets are blue,\nTesting is fun,\nAnd Mocking is too!";
+    }
+
+    return "This is a mock response from DuckAI server. Testing was successful!";
   }
 
   /**
@@ -182,7 +272,38 @@ export class DuckAI {
     }
   }
 
-  private async getEncodedVqdHash(vqdHash: string): Promise<string> {
+  private async getActiveFeVersion(userAgent: string): Promise<string> {
+    try {
+      const response = await gotScraping({
+        url: "https://duck.ai/",
+        method: "GET",
+        http2: false,
+        headers: {
+          "User-Agent": userAgent,
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        }
+      });
+      const html = response.body;
+
+      // Update entry script bundle name for the Error stack mock
+      const entryScriptMatch = html.match(/\/dist\/duckai-dist\/entry\.duckai\.[a-f0-9]+\.js/);
+      if (entryScriptMatch) {
+        this.entryScriptName = entryScriptMatch[0];
+      }
+
+      const tagMatch = html.match(/data-version-tag=["']([^"']+)["']/);
+      const shaMatch = html.match(/data-version-sha=["']([^"']+)["']/);
+      if (tagMatch && shaMatch) {
+        return `${tagMatch[1]}-${shaMatch[1]}`;
+      }
+    } catch (e) {
+      // Ignore error and fallback
+    }
+    return "serp_20260623_020209_ET-86e443857a570e5721d1a26369c4d0389e98becf"; // Fallback to current latest version
+  }
+
+  private async getEncodedVqdHash(vqdHash: string, userAgent: string): Promise<string> {
     const jsScript = Buffer.from(vqdHash, 'base64').toString('utf-8');
 
     const dom = new JSDOM(
@@ -193,11 +314,133 @@ export class DuckAI {
 </head>
 <body></body>
 </html>" style="position: absolute; left: -9999px; top: -9999px;"></iframe>`,
-      { runScripts: 'dangerously' }
+      {
+        runScripts: 'dangerously',
+        userAgent: userAgent,
+        url: "https://duck.ai/"
+      }
     );
+
+    // Override webdriver and userAgent on Navigator PROTOTYPE (very important, JSDOM reads prototype!)
+    Object.defineProperty(dom.window.Navigator.prototype, 'userAgent', {
+      get: () => userAgent,
+      configurable: true
+    });
+    Object.defineProperty(dom.window.Navigator.prototype, 'webdriver', {
+      get: () => false,
+      configurable: true
+    });
+
+    // Override userAgent and webdriver on main instance as fallback
+    Object.defineProperty(dom.window.navigator, 'userAgent', {
+      get: () => userAgent,
+      configurable: true
+    });
+    Object.defineProperty(dom.window.navigator, 'webdriver', {
+      get: () => false,
+      configurable: true
+    });
+
+    // Mock HTML layout properties on HTMLElement prototype
+    Object.defineProperties(dom.window.HTMLElement.prototype, {
+      offsetWidth: {
+        get() { return 100; },
+        configurable: true
+      },
+      offsetHeight: {
+        get() { return 30; },
+        configurable: true
+      },
+      clientWidth: {
+        get() { return 100; },
+        configurable: true
+      },
+      clientHeight: {
+        get() { return 30; },
+        configurable: true
+      },
+      scrollHeight: {
+        get() { return 30; },
+        configurable: true
+      },
+      scrollWidth: {
+        get() { return 100; },
+        configurable: true
+      }
+    });
+
+    dom.window.HTMLElement.prototype.getBoundingClientRect = function() {
+      return {
+        width: 100,
+        height: 30,
+        top: 10,
+        left: 10,
+        right: 110,
+        bottom: 40,
+        x: 10,
+        y: 10,
+        toJSON() { return {}; }
+      } as any;
+    };
+
     dom.window.top.__DDG_BE_VERSION__ = 1;
     dom.window.top.__DDG_FE_CHAT_HASH__ = 1;
     const jsa = dom.window.top.document.querySelector('#jsa') as HTMLIFrameElement;
+
+    // Mask properties in iframe window context as well
+    const iframeWindow = jsa.contentWindow;
+    if (iframeWindow) {
+      Object.defineProperty(iframeWindow.Navigator.prototype, 'userAgent', {
+        get: () => userAgent,
+        configurable: true
+      });
+      Object.defineProperty(iframeWindow.Navigator.prototype, 'webdriver', {
+        get: () => false,
+        configurable: true
+      });
+
+      Object.defineProperties(iframeWindow.HTMLElement.prototype, {
+        offsetWidth: {
+          get() { return 100; },
+          configurable: true
+        },
+        offsetHeight: {
+          get() { return 30; },
+          configurable: true
+        },
+        clientWidth: {
+          get() { return 100; },
+          configurable: true
+        },
+        clientHeight: {
+          get() { return 30; },
+          configurable: true
+        },
+        scrollHeight: {
+          get() { return 30; },
+          configurable: true
+        },
+        scrollWidth: {
+          get() { return 100; },
+          configurable: true
+        }
+      });
+
+      iframeWindow.HTMLElement.prototype.getBoundingClientRect = function() {
+        return {
+          width: 100,
+          height: 30,
+          top: 10,
+          left: 10,
+          right: 110,
+          bottom: 40,
+          x: 10,
+          y: 10,
+          toJSON() { return {}; }
+        } as any;
+      };
+    }
+
     const contentDoc = jsa.contentDocument || jsa.contentWindow!.document;
 
     const meta = contentDoc.createElement('meta');
@@ -206,10 +449,15 @@ export class DuckAI {
     contentDoc.head.appendChild(meta);
     const result = await dom.window.eval(jsScript) as {
       client_hashes: string[];
+      meta: Record<string, any>;
       [key: string]: any;
     };
 
-    result.client_hashes[0] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36';
+    // Spoof client-side metadata properties injected by React wrapper
+    result.meta.origin = "https://duck.ai";
+    result.meta.duration = Math.floor(Math.random() * 5 + 8).toString();
+    result.meta.stack = `Error\n    at l (https://duck.ai${this.entryScriptName}:2:1438602)\n    at async https://duck.ai${this.entryScriptName}:2:1288095`;
+
     result.client_hashes = result.client_hashes.map((t) => {
       const hash = createHash('sha256');
       hash.update(t);
@@ -221,33 +469,32 @@ export class DuckAI {
   }
 
   private async getVQD(userAgent: string): Promise<VQDResponse> {
-    const response = await fetch("https://duckduckgo.com/duckchat/v1/status", {
+    const response = await gotScraping({
+      url: "https://duck.ai/duckchat/v1/status",
+      method: "GET",
+      http2: false,
       headers: {
-        accept: "*/*",
-        "accept-language": "en-US,en;q=0.9,fa;q=0.8",
-        "cache-control": "no-store",
-        pragma: "no-cache",
-        priority: "u=1, i",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-store",
+        "Pragma": "no-cache",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
         "x-vqd-accept": "1",
         "User-Agent": userAgent,
+        "Origin": "https://duck.ai:443",
+        "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
       },
-      referrer: "https://duckduckgo.com/",
-      referrerPolicy: "origin",
-      method: "GET",
-      mode: "cors",
-      credentials: "include",
+      // gotScraping supports context/referrer via options
+      context: {
+        referrer: "https://duck.ai/",
+      }
     });
 
-    if (!response.ok) {
-      throw new Error(
-        `Failed to get VQD: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const hashHeader = response.headers.get("x-Vqd-hash-1");
+    const hashHeader = response.headers["x-vqd-hash-1"] as string;
 
     if (!hashHeader) {
       throw new Error(
@@ -255,7 +502,7 @@ export class DuckAI {
       );
     }
 
-    const encodedHash = await this.getEncodedVqdHash(hashHeader);
+    const encodedHash = await this.getEncodedVqdHash(hashHeader, userAgent);
 
     return { hash: encodedHash };
   }
@@ -275,11 +522,16 @@ export class DuckAI {
   }
 
   async chat(request: DuckAIRequest): Promise<string> {
+    if (process.env.MOCK_DUCK_AI === "true") {
+      return this.getMockResponse(request);
+    }
+
     // Wait if rate limiting is needed
     await this.waitIfNeeded();
 
-    const userAgent = new UserAgent().toString();
+    const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36";
     const vqd = await this.getVQD(userAgent);
+    const activeFeVersion = await this.getActiveFeVersion(userAgent);
 
     // Update rate limit tracking BEFORE making the request
     const now = Date.now();
@@ -290,45 +542,68 @@ export class DuckAI {
     // Show compact rate limit status in server console
     this.rateLimitMonitor.printCompactStatus();
 
-    const response = await fetch("https://duckduckgo.com/duckchat/v1/chat", {
+    // Generate random journey ID and signals to complete standard browser headers
+    const journeyId = createHash("md5").update(Math.random().toString()).digest("hex");
+    const startTimestamp = Date.now() - 10000;
+    const mockSignalsObj = {
+      start: startTimestamp,
+      events: [
+        { name: "clearConversation", delta: 1000 },
+        { name: "startNewChat_free", delta: 1500 }
+      ],
+      end: startTimestamp + 9000
+    };
+    const feSignals = Buffer.from(JSON.stringify(mockSignalsObj)).toString("base64");
+
+    const chatBody = {
+      model: request.model,
+      messages: request.messages,
+      canUseTools: true,
+      reasoningEffort: "none"
+    };
+
+    const response = await gotScraping({
+      url: "https://duck.ai/duckchat/v1/chat",
+      method: "POST",
+      http2: false,
       headers: {
-        accept: "text/event-stream",
-        "accept-language": "en-US,en;q=0.9,fa;q=0.8",
-        "cache-control": "no-cache",
-        "content-type": "application/json",
-        pragma: "no-cache",
-        priority: "u=1, i",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-fe-version": "serp_20250401_100419_ET-19d438eb199b2bf7c300",
+        "Accept": "text/event-stream",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "x-fe-version": activeFeVersion,
         "User-Agent": userAgent,
         "x-vqd-hash-1": vqd.hash,
+        "x-ddg-journey-id": journeyId,
+        "x-fe-signals": feSignals,
+        "Origin": "https://duck.ai:443",
+        "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
       },
-      referrer: "https://duckduckgo.com/",
-      referrerPolicy: "origin",
-      body: JSON.stringify(request),
-      method: "POST",
-      mode: "cors",
-      credentials: "include",
+      json: chatBody,
+      throwHttpErrors: false,
     });
 
     // Handle rate limiting
-    if (response.status === 429) {
-      const retryAfter = response.headers.get("retry-after");
-      const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 60000; // Default 1 minute
+    if (response.statusCode === 429) {
+      const retryAfter = response.headers["retry-after"];
+      const waitTime = retryAfter ? parseInt(retryAfter as string) * 1000 : 60000; // Default 1 minute
       throw new Error(
-        `Rate limited. Retry after ${waitTime}ms. Status: ${response.status}`
+        `Rate limited. Retry after ${waitTime}ms. Status: ${response.statusCode}`
       );
     }
 
-    if (!response.ok) {
+    if (response.statusCode !== 200) {
       throw new Error(
-        `DuckAI API error: ${response.status} ${response.statusText}`
+        `DuckAI API error: ${response.statusCode} ${response.statusMessage}`
       );
     }
 
-    const text = await response.text();
+    const text = response.body;
 
     // Check for errors
     try {
@@ -368,11 +643,22 @@ export class DuckAI {
   }
 
   async chatStream(request: DuckAIRequest): Promise<ReadableStream<string>> {
+    if (process.env.MOCK_DUCK_AI === "true") {
+      const mockText = await this.getMockResponse(request);
+      return new ReadableStream({
+        start(controller) {
+          controller.enqueue(mockText);
+          controller.close();
+        },
+      });
+    }
+
     // Wait if rate limiting is needed
     await this.waitIfNeeded();
 
-    const userAgent = new UserAgent().toString();
+    const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     const vqd = await this.getVQD(userAgent);
+    const activeFeVersion = await this.getActiveFeVersion(userAgent);
 
     // Update rate limit tracking BEFORE making the request
     const now = Date.now();
@@ -383,93 +669,102 @@ export class DuckAI {
     // Show compact rate limit status in server console
     this.rateLimitMonitor.printCompactStatus();
 
-    const response = await fetch("https://duckduckgo.com/duckchat/v1/chat", {
+    // Generate random journey ID and signals to complete standard browser headers
+    const journeyId = createHash("md5").update(Math.random().toString()).digest("hex");
+    const startTimestamp = Date.now() - 10000;
+    const mockSignalsObj = {
+      start: startTimestamp,
+      events: [
+        { name: "clearConversation", delta: 1000 },
+        { name: "startNewChat_free", delta: 1500 }
+      ],
+      end: startTimestamp + 9000
+    };
+    const feSignals = Buffer.from(JSON.stringify(mockSignalsObj)).toString("base64");
+
+    const chatBody = {
+      model: request.model,
+      messages: request.messages,
+      canUseTools: true,
+      reasoningEffort: "none"
+    };
+
+    const responseStream = gotScraping.stream({
+      url: "https://duck.ai/duckchat/v1/chat",
+      method: "POST",
+      http2: false,
       headers: {
-        accept: "text/event-stream",
-        "accept-language": "en-US,en;q=0.9,fa;q=0.8",
-        "cache-control": "no-cache",
-        "content-type": "application/json",
-        pragma: "no-cache",
-        priority: "u=1, i",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-fe-version": "serp_20250401_100419_ET-19d438eb199b2bf7c300",
+        "Accept": "text/event-stream",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "x-fe-version": activeFeVersion,
         "User-Agent": userAgent,
         "x-vqd-hash-1": vqd.hash,
+        "x-ddg-journey-id": journeyId,
+        "x-fe-signals": feSignals,
+        "Origin": "https://duck.ai:443",
+        "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
       },
-      referrer: "https://duckduckgo.com/",
-      referrerPolicy: "origin",
-      body: JSON.stringify(request),
-      method: "POST",
-      mode: "cors",
-      credentials: "include",
+      json: chatBody,
     });
-
-    // Handle rate limiting
-    if (response.status === 429) {
-      const retryAfter = response.headers.get("retry-after");
-      const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 60000; // Default 1 minute
-      throw new Error(
-        `Rate limited. Retry after ${waitTime}ms. Status: ${response.status}`
-      );
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        `DuckAI API error: ${response.status} ${response.statusText}`
-      );
-    }
-
-    if (!response.body) {
-      throw new Error("No response body");
-    }
 
     return new ReadableStream({
       start(controller) {
-        const reader = response.body!.getReader();
+        responseStream.on("response", (res) => {
+          if (res.statusCode === 429) {
+            const retryAfter = res.headers["retry-after"];
+            const waitTime = retryAfter ? parseInt(retryAfter as string) * 1000 : 60000;
+            controller.error(new Error(`Rate limited. Retry after ${waitTime}ms. Status: 429`));
+            responseStream.destroy();
+          } else if (res.statusCode !== 200) {
+            controller.error(new Error(`DuckAI API error: ${res.statusCode} ${res.statusMessage}`));
+            responseStream.destroy();
+          }
+        });
+
         const decoder = new TextDecoder();
-
-        function pump(): Promise<void> {
-          return reader.read().then(({ done, value }) => {
-            if (done) {
-              controller.close();
-              return;
-            }
-
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split("\n");
-
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                try {
-                  const json = JSON.parse(line.slice(6));
-                  if (json.message) {
-                    controller.enqueue(json.message);
-                  }
-                } catch (e) {
-                  // Skip invalid JSON
+        responseStream.on("data", (chunk: Buffer) => {
+          const text = decoder.decode(chunk, { stream: true });
+          const lines = text.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const json = JSON.parse(line.slice(6));
+                if (json.message) {
+                  controller.enqueue(json.message);
                 }
+              } catch (e) {
+                // Skip invalid JSON
               }
             }
+          }
+        });
 
-            return pump();
-          });
-        }
+        responseStream.on("end", () => {
+          controller.close();
+        });
 
-        return pump();
+        responseStream.on("error", (err) => {
+          controller.error(err);
+        });
       },
+      cancel() {
+        responseStream.destroy();
+      }
     });
   }
 
   getAvailableModels(): string[] {
     return [
-      "gpt-4o-mini",
-      "gpt-5-mini",
-      "claude-3-5-haiku-latest",
-      "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-      "mistralai/Mistral-Small-24B-Instruct-2501",
-      "openai/gpt-oss-120b"
+      "gpt-5.4-mini",
+      "gpt-5.4-nano",
+      "claude-haiku-4-5"
     ];
   }
 }

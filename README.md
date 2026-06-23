@@ -50,7 +50,7 @@ const openai = new OpenAI({
 
 // Chat completion
 const completion = await openai.chat.completions.create({
-  model: "gpt-4o-mini", // Default model
+  model: "gpt-5.4-mini", // Default model
   messages: [
     { role: "user", content: "Hello! How are you?" }
   ],
@@ -63,7 +63,7 @@ console.log(completion.choices[0].message.content);
 
 DuckAI OpenAI Server bridges the gap between DuckDuckGo's free AI chat service and the widely-adopted OpenAI API format. This allows you to:
 
-- **Use multiple AI models for free** - Access GPT-4o-mini, Claude-3-Haiku, Llama-3.3-70B, and more
+- **Use multiple AI models for free** - Access GPT-5.4-mini, Claude-Haiku-4.5, and GPT-5.4-nano
 - **Drop-in OpenAI replacement** - Compatible with existing OpenAI client libraries
 - **Tool calling support** - Full function calling capabilities
 - **Streaming responses** - Real-time response streaming
@@ -71,12 +71,9 @@ DuckAI OpenAI Server bridges the gap between DuckDuckGo's free AI chat service a
 
 ### Supported Models
 
-- `gpt-4o-mini` (Default)
-- `gpt-5-mini`
-- `claude-3-5-haiku-latest`
-- `meta-llama/Llama-4-Scout-17B-16E-Instruct`
-- `mistralai/Mistral-Small-24B-Instruct-2501`
-- `openai/gpt-oss-120b`
+- `gpt-5.4-mini` (Default)
+- `gpt-5.4-nano`
+- `claude-haiku-4-5`
 
 ### Features
 
@@ -129,7 +126,7 @@ const openai = new OpenAI({
 
 // Basic chat completion
 const completion = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
+  model: "gpt-5.4-mini",
   messages: [
     { role: "user", content: "Hello! How are you?" }
   ],
@@ -162,7 +159,7 @@ const tools = [
 ];
 
 const completion = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
+  model: "gpt-5.4-mini",
   messages: [
     { role: "user", content: "What is 15 * 8?" }
   ],
@@ -178,7 +175,7 @@ console.log(completion.choices[0].message.tool_calls);
 
 ```javascript
 const stream = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
+  model: "gpt-5.4-mini",
   messages: [
     { role: "user", content: "Tell me a story" }
   ],
@@ -200,7 +197,7 @@ curl -X POST http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer dummy-key" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-mini",
     "messages": [
       {"role": "user", "content": "Hello!"}
     ]
@@ -231,6 +228,19 @@ docker build -t duckai .
 ```bash
 docker run -p 3000:3000 duckai
 ```
+
+## Troubleshooting & Anti-Bot Wind Control (WAF)
+
+### 418 I'm a Teapot (ERR_BN_LIMIT)
+
+Duck.ai (DuckDuckGo AI Chat) uses highly sophisticated Cloudflare & Nginx anti-bot shield rules. If you attempt to connect and receive a `418` status code with `ERR_BN_LIMIT` or `ERR_CHALLENGE`, it is likely due to the following WAF defenses:
+
+1. **TLS Fingerprint matching (JA3/JA4)**: The standard fetch in Node.js/Bun uses the native OpenSSL stack which sends TLS handshakes that look different from modern browsers (BoringSSL). When WAF detects a standard User-Agent header (like Chrome) but paired with a Node.js/Bun TLS handshake, it instantly blocks with 418.
+2. **HTML5 Parsing & CSS Layout Spoor**: The dynamic challenge payload (`x-vqd-hash-1`) runs an evaluation script in memory. It measures native DOM metrics (such as `offsetWidth`, `scrollHeight`, and `getBoundingClientRect`) of dynamically appended elements (like `li` and `div`). In mock environments (JSDOM), these evaluate as `0` or violate logical styling constraints (e.g. `li` element width identical to `div`), revealing headless bot activity.
+
+**Recommendations:**
+* **Use Local Mocking (Recommended for development)**: Start the server with `MOCK_DUCK_AI=true` to bypass the backend WAF check completely and test all OpenAI SDK features (tool calling, streaming, models list, CORS) locally offline.
+* **Spoofing TLS**: We integrated `got-scraping` into `src/duckai.ts` to spoof Chrome TLS handshakes and inject Client Hints (`sec-ch-ua`, `Origin`, etc.) in application headers. If WAF blocks persist in your network environment, consider running the proxy behind a Chromium-based driver instance (like Playwright/Puppeteer) or a browser-impersonating container (e.g., `curl-impersonate`).
 
 ## Contributing
 

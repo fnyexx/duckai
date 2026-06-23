@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { RateLimitMonitor } from "../src/rate-limit-monitor";
+import { SharedRateLimitMonitor as RateLimitMonitor } from "../src/shared-rate-limit-monitor";
 import { OpenAIService } from "../src/openai-service";
+
+process.env.MOCK_DUCK_AI = "true";
 
 describe("Rate Limit Monitor", () => {
   let monitor: RateLimitMonitor;
@@ -9,6 +11,9 @@ describe("Rate Limit Monitor", () => {
   beforeEach(() => {
     monitor = new RateLimitMonitor();
     openAIService = new OpenAIService();
+
+    // Clear shared rate limit store to avoid state pollution from previous real requests
+    openAIService["duckAI"]["rateLimitStore"].clear();
   });
 
   describe("getCurrentStatus", () => {
@@ -93,7 +98,7 @@ describe("Rate Limit Monitor", () => {
 
       try {
         await openAIService.createChatCompletion({
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           messages: [{ role: "user", content: "Test" }],
         });
 
@@ -141,9 +146,10 @@ describe("Rate Limit Monitor", () => {
     it("should recommend waiting when requests are too frequent", () => {
       const duckAI = openAIService["duckAI"];
 
-      // Simulate recent request
+      // Simulate recent request and write to store so it is not overwritten by loadRateLimitFromStore()
       if (duckAI["rateLimitInfo"]) {
         duckAI["rateLimitInfo"].lastRequestTime = Date.now() - 500; // 500ms ago
+        duckAI["saveRateLimitToStore"]();
       }
 
       const status = openAIService.getRateLimitStatus();
@@ -155,12 +161,13 @@ describe("Rate Limit Monitor", () => {
     it("should detect when rate limit is exceeded", () => {
       const duckAI = openAIService["duckAI"];
 
-      // Simulate hitting rate limit by directly manipulating the rate limit info
+      // Simulate hitting rate limit by directly manipulating the rate limit info and saving to store
       if (duckAI["rateLimitInfo"]) {
-        const rateLimitInfo = duckAI["rateLimitInfo"];
-        rateLimitInfo.requestCount = 25; // Exceed the limit of 20
-        rateLimitInfo.windowStart = Date.now(); // Ensure current window
+        const rateLimitInfo = duckAI["rateLimitInfo"] as any;
+        const now = Date.now();
+        rateLimitInfo.requestTimestamps = Array(25).fill(now); // Exceed the limit of 20 in sliding window
         rateLimitInfo.isLimited = true; // Mark as limited
+        duckAI["saveRateLimitToStore"]();
       }
 
       // Get status directly from the modified state
@@ -185,7 +192,7 @@ describe("Rate Limit Monitor", () => {
 
       try {
         await openAIService.createChatCompletion({
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           messages: [{ role: "user", content: "Test" }],
         });
 

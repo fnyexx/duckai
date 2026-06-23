@@ -119,5 +119,5 @@ console.log(
 );
 console.log(`  -H "Content-Type: application/json" \\`);
 console.log(
-  `  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"Hello!"}]}'`
+  `  -d '{"model":"gpt-5.4-mini","messages":[{"role":"user","content":"Hello!"}]}'`
 );

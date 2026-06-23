@@ -15,6 +15,7 @@
     "test:all": "bun test tests/server.test.ts tests/openai-simple.test.ts tests/tool-service.test.ts tests/openai-tools.test.ts"
   },
   "dependencies": {
+    "got-scraping": "^4.2.1",
     "jsdom": "^25.0.1",
     "openai": "^4.103.0",
     "user-agents": "^1.1.0"

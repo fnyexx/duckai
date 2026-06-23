@@ -6,6 +6,8 @@ import type {
   ToolCall,
 } from "../src/types";
 
+process.env.MOCK_DUCK_AI = "true";
+
 describe("OpenAIService with Tools", () => {
   let openAIService: OpenAIService;
 
@@ -60,7 +62,7 @@ describe("OpenAIService with Tools", () => {
   describe("validateRequest with tools", () => {
     it("should validate requests with valid tools", () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "What's the weather like?" }],
         tools: sampleTools,
       };
@@ -71,7 +73,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should reject requests with invalid tools", () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Hello" }],
         tools: [
           {
@@ -88,7 +90,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should validate tool messages", () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           { role: "user", content: "What time is it?" },
           {
@@ -119,7 +121,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should reject tool messages without tool_call_id", () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "tool",
@@ -210,7 +212,7 @@ describe("OpenAIService with Tools", () => {
   describe("createChatCompletion with tools", () => {
     it("should handle requests without tools normally", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Hello, how are you?" }],
       };
 
@@ -232,7 +234,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should detect and extract function calls from AI response", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "What time is it?" }],
         tools: [sampleTools[0]], // get_current_time
       };
@@ -269,7 +271,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should handle tool_choice 'required'", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Calculate 5 + 3" }],
         tools: [sampleTools[1]], // calculate
         tool_choice: "required",
@@ -279,7 +281,7 @@ describe("OpenAIService with Tools", () => {
       const originalChat = openAIService["duckAI"].chat;
       openAIService["duckAI"].chat = async (req) => {
         // Verify that the system prompt contains the required instruction
-        const systemMessage = req.messages.find((m) => m.role === "system");
+        const systemMessage = req.messages.find((m) => m.role === "user" && m.content?.includes("[SYSTEM INSTRUCTIONS]"));
         expect(systemMessage?.content).toContain(
           "You MUST call at least one function"
         );
@@ -307,7 +309,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should handle tool_choice 'none'", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Hello" }],
         tools: sampleTools,
         tool_choice: "none",
@@ -333,7 +335,7 @@ describe("OpenAIService with Tools", () => {
   describe("createChatCompletionStream with tools", () => {
     it("should handle streaming with function calls", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "What time is it?" }],
         tools: sampleTools,
         stream: true,
@@ -379,7 +381,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should handle streaming without tools", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Hello!" }],
         stream: true,
       };
@@ -416,7 +418,7 @@ describe("OpenAIService with Tools", () => {
   describe("Advanced Tool Scenarios", () => {
     it("should handle tool_choice with specific function", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Calculate something" }],
         tools: sampleTools,
         tool_choice: {
@@ -444,7 +446,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should handle empty response from Duck.ai gracefully", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Test" }],
         tools: sampleTools,
         tool_choice: "required",
@@ -466,7 +468,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should handle conversation with multiple tool calls", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           { role: "user", content: "What time is it and what's 2+2?" },
           {
@@ -527,7 +529,7 @@ describe("OpenAIService with Tools", () => {
       // Test with empty tools array
       expect(() => {
         openAIService.validateRequest({
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           messages: [{ role: "user", content: "test" }],
           tools: [],
         });
@@ -536,7 +538,7 @@ describe("OpenAIService with Tools", () => {
       // Test with null tools
       expect(() => {
         openAIService.validateRequest({
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           messages: [{ role: "user", content: "test" }],
           tools: null,
         });
@@ -545,7 +547,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should handle malformed tool_calls in assistant messages", () => {
       const request = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "assistant",
@@ -597,7 +599,7 @@ describe("OpenAIService with Tools", () => {
     // Additional advanced scenarios
     it("should handle tool_choice with non-existent function gracefully", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Test" }],
         tools: sampleTools,
         tool_choice: {
@@ -625,7 +627,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should handle complex tool arguments extraction", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           { role: "user", content: "Calculate the result of 15 * 8 + 42" },
         ],
@@ -657,7 +659,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should handle weather function with location extraction", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "user",
@@ -692,7 +694,7 @@ describe("OpenAIService with Tools", () => {
 
     it("should handle mixed content with function calls", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Hello! What time is it?" }],
         tools: sampleTools,
       };

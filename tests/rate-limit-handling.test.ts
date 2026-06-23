@@ -39,7 +39,7 @@ describe("Rate Limiting and Error Handling", () => {
   describe("Duck.ai API Error Handling", () => {
     it("should handle rate limiting gracefully with fallback", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "What time is it?" }],
         tools: sampleTools,
         tool_choice: "required",
@@ -71,7 +71,7 @@ describe("Rate Limiting and Error Handling", () => {
 
     it("should handle empty responses with tool_choice required", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Calculate 5 + 3" }],
         tools: sampleTools,
         tool_choice: "required",
@@ -98,7 +98,7 @@ describe("Rate Limiting and Error Handling", () => {
 
     it("should handle network errors gracefully", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Hello" }],
         tools: sampleTools,
       };
@@ -124,7 +124,7 @@ describe("Rate Limiting and Error Handling", () => {
 
     it("should handle malformed responses from Duck.ai", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Test" }],
         tools: sampleTools,
       };
@@ -149,7 +149,7 @@ describe("Rate Limiting and Error Handling", () => {
 
     it("should handle partial JSON responses", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Test" }],
         tools: sampleTools,
       };
@@ -173,7 +173,7 @@ describe("Rate Limiting and Error Handling", () => {
   describe("Resilience Testing", () => {
     it("should handle rapid consecutive requests", async () => {
       const requests = Array.from({ length: 5 }, (_, i) => ({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: `Test message ${i}` }],
         tools: sampleTools,
       }));
@@ -223,7 +223,7 @@ describe("Rate Limiting and Error Handling", () => {
 
     it("should handle streaming errors gracefully", async () => {
       const request: ChatCompletionRequest = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Test streaming" }],
         stream: true,
       };
@@ -280,7 +280,7 @@ describe("Rate Limiting and Error Handling", () => {
 
       for (const testCase of testCases) {
         const request: ChatCompletionRequest = {
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           messages: [{ role: "user", content: testCase.message }],
           tools: sampleTools,
           tool_choice: "required",

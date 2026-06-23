@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 
+process.env.MOCK_DUCK_AI = "true";
+
 const BASE_URL = "http://localhost:3002";
 let server: any;
 
@@ -7,7 +9,7 @@ beforeAll(async () => {
   // Start the server for testing
   const { spawn } = require("child_process");
   server = spawn("bun", ["run", "src/server.ts"], {
-    env: { ...process.env, PORT: "3002" },
+    env: { ...process.env, PORT: "3002", MOCK_DUCK_AI: "true" },
     stdio: "pipe",
   });
 
@@ -67,7 +69,7 @@ describe("OpenAI Compatible Server", () => {
   describe("Chat Completions", () => {
     it("should handle basic chat completion", async () => {
       const requestBody = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Say hello" }],
       };
 
@@ -83,7 +85,7 @@ describe("OpenAI Compatible Server", () => {
       expect(data).toHaveProperty("id");
       expect(data).toHaveProperty("object", "chat.completion");
       expect(data).toHaveProperty("created");
-      expect(data).toHaveProperty("model", "gpt-4o-mini");
+      expect(data).toHaveProperty("model", "gpt-5.4-mini");
       expect(data).toHaveProperty("choices");
       expect(data).toHaveProperty("usage");
 
@@ -114,7 +116,7 @@ describe("OpenAI Compatible Server", () => {
 
     it("should handle streaming chat completion", async () => {
       const requestBody = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "Count to 3" }],
         stream: true,
       };
@@ -164,7 +166,7 @@ describe("OpenAI Compatible Server", () => {
           expect(data).toHaveProperty("id");
           expect(data).toHaveProperty("object", "chat.completion.chunk");
           expect(data).toHaveProperty("created");
-          expect(data).toHaveProperty("model", "gpt-4o-mini");
+          expect(data).toHaveProperty("model", "gpt-5.4-mini");
           expect(data).toHaveProperty("choices");
 
           const choice = data.choices[0];
@@ -198,7 +200,7 @@ describe("OpenAI Compatible Server", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           messages: [{ role: "invalid", content: "test" }],
         }),
       });
@@ -211,7 +213,7 @@ describe("OpenAI Compatible Server", () => {
 
     it("should handle multiple messages", async () => {
       const requestBody = {
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-mini",
         messages: [{ role: "user", content: "What is 2+2?" }],
       };
 
