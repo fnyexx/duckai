@@ -716,27 +716,52 @@ export class DuckAI {
 
     return new ReadableStream({
       start(controller) {
+        let isClosed = false;
+
+        const safeClose = () => {
+          if (!isClosed) {
+            isClosed = true;
+            try {
+              controller.close();
+            } catch (e) {
+              // Ignore invalid state errors
+            }
+          }
+        };
+
+        const safeError = (err: Error) => {
+          if (!isClosed) {
+            isClosed = true;
+            try {
+              controller.error(err);
+            } catch (e) {
+              // Ignore invalid state errors
+            }
+          }
+        };
+
         responseStream.on("response", (res) => {
           if (res.statusCode === 429) {
             const retryAfter = res.headers["retry-after"];
             const waitTime = retryAfter ? parseInt(retryAfter as string) * 1000 : 60000;
-            controller.error(new Error(`Rate limited. Retry after ${waitTime}ms. Status: 429`));
+            safeError(new Error(`Rate limited. Retry after ${waitTime}ms. Status: 429`));
             responseStream.destroy();
           } else if (res.statusCode !== 200) {
-            controller.error(new Error(`DuckAI API error: ${res.statusCode} ${res.statusMessage}`));
+            safeError(new Error(`DuckAI API error: ${res.statusCode} ${res.statusMessage}`));
             responseStream.destroy();
           }
         });
 
         const decoder = new TextDecoder();
         responseStream.on("data", (chunk: Buffer) => {
+          if (isClosed) return;
           const text = decoder.decode(chunk, { stream: true });
           const lines = text.split("\n");
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               try {
                 const json = JSON.parse(line.slice(6));
-                if (json.message) {
+                if (json.message && !isClosed) {
                   controller.enqueue(json.message);
                 }
               } catch (e) {
@@ -747,11 +772,11 @@ export class DuckAI {
         });
 
         responseStream.on("end", () => {
-          controller.close();
+          safeClose();
         });
 
         responseStream.on("error", (err) => {
-          controller.error(err);
+          safeError(err);
         });
       },
       cancel() {
