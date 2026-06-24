@@ -110,6 +110,22 @@ describe("OpenAI JavaScript Library - Core Tests", () => {
       expect(completion.model).toBe("gpt-4o");
     });
 
+    it("should match and fallback unknown model names gracefully", async () => {
+      const completion = await openai.chat.completions.create({
+        model: "custom-unsupported-claude-model",
+        messages: [{ role: "user", content: "Say hello" }],
+      });
+      // Should fallback to claude-haiku-4-5 under the hood, and return requested model name
+      expect(completion.model).toBe("custom-unsupported-claude-model");
+
+      const completionMini = await openai.chat.completions.create({
+        model: "strange-random-name",
+        messages: [{ role: "user", content: "Say hello" }],
+      });
+      // Should fallback to gpt-5.4-mini under the hood
+      expect(completionMini.model).toBe("strange-random-name");
+    });
+
     it("should handle system messages", async () => {
       const completion = await openai.chat.completions.create({
         model: "gpt-5.4-mini",

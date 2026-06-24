@@ -103,10 +103,62 @@ export class OpenAIService {
       "claude-3-opus": "claude-haiku-4-5",
     };
 
-    const requestedModel = request.model || "gpt-5.4-mini";
-    const targetModel = modelMap[requestedModel] || requestedModel;
+    const supportedModels = ["gpt-5.4-mini", "gpt-5.4-nano", "claude-haiku-4-5"];
 
-    const duckAIMessages: DuckAIMessage[] = request.messages.map((m) => ({
+    const requestedModel = request.model || "gpt-5.4-mini";
+    let targetModel = modelMap[requestedModel] || requestedModel;
+
+    // Fuzzy matching fallback
+    if (!supportedModels.includes(targetModel)) {
+      const lowerModel = targetModel.toLowerCase();
+      if (lowerModel.includes("claude")) {
+        targetModel = "claude-haiku-4-5";
+      } else if (lowerModel.includes("nano")) {
+        targetModel = "gpt-5.4-nano";
+      } else {
+        targetModel = "gpt-5.4-mini";
+      }
+    }
+
+    // 1. Extract all system messages and combine them
+    const systemMessages = request.messages.filter((m) => m.role === "system");
+    const systemPrompt = systemMessages
+      .map((m) => this.extractTextFromContent(m.content))
+      .filter(Boolean)
+      .join("\n");
+
+    let processedMessages = [...request.messages];
+
+    if (systemPrompt) {
+      // 2. Find the first user message to inject system instructions
+      const firstUserMsgIndex = processedMessages.findIndex((m) => m.role === "user");
+
+      if (firstUserMsgIndex !== -1) {
+        const userMsg = { ...processedMessages[firstUserMsgIndex] };
+        const userContent = this.extractTextFromContent(userMsg.content);
+        userMsg.content = `[System Instructions]\n${systemPrompt}\n\n${userContent}`;
+        processedMessages[firstUserMsgIndex] = userMsg;
+
+        // Filter out original system messages
+        processedMessages = processedMessages.filter((m) => m.role !== "system");
+      } else {
+        // No user messages found, convert first system message into a user message
+        const firstSystemMsgIndex = processedMessages.findIndex((m) => m.role === "system");
+        if (firstSystemMsgIndex !== -1) {
+          const firstSys = { ...processedMessages[firstSystemMsgIndex] };
+          firstSys.role = "user" as const;
+          firstSys.content = `[System Instructions]\n${systemPrompt}`;
+
+          processedMessages = processedMessages.filter((m, idx) => m.role !== "system" || idx === firstSystemMsgIndex);
+          processedMessages[0] = firstSys;
+        }
+      }
+    } else {
+      // Filter out system messages even if systemPrompt is empty
+      processedMessages = processedMessages.filter((m) => m.role !== "system");
+    }
+
+    const duckAIMessages: DuckAIMessage[] = processedMessages.map((m) => ({
       role: m.role,
       content: this.extractTextFromContent(m.content),
       name: m.name,
@@ -464,6 +516,19 @@ Please follow these instructions when responding to the following user message.`
             controller.enqueue(new TextEncoder().encode(data));
 
             return pump();
+          }).catch((err) => {
+            console.error("Stream reader error in OpenAI Service:", err);
+            const errResponse = {
+              error: {
+                message: err instanceof Error ? err.message : "Stream read error",
+                type: "internal_server_error",
+                param: null,
+                code: null
+              }
+            };
+            const errData = `data: ${JSON.stringify(errResponse)}\n\n`;
+            controller.enqueue(new TextEncoder().encode(errData));
+            controller.close();
           });
         }
 
