@@ -560,7 +560,7 @@ export class DuckAI {
       model: request.model,
       messages: request.messages,
       canUseTools: true,
-      reasoningEffort: "none"
+      reasoningEffort: request.reasoningEffort || "none"
     };
 
     const response = await gotScraping({
@@ -694,7 +694,7 @@ export class DuckAI {
       model: request.model,
       messages: request.messages,
       canUseTools: true,
-      reasoningEffort: "none"
+      reasoningEffort: request.reasoningEffort || "none"
     };
 
     const responseStream = gotScraping.stream({

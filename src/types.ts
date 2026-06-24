@@ -73,6 +73,7 @@ export interface ChatCompletionRequest {
   stop?: string | string[];
   tools?: ToolDefinition[];
   tool_choice?: ToolChoice;
+  reasoning_effort?: "low" | "medium" | "high" | "none" | string;
 }
 
 export interface ChatCompletionChoice {
@@ -141,4 +142,5 @@ export interface DuckAIMessage {
 export interface DuckAIRequest {
   model: string;
   messages: DuckAIMessage[];
+  reasoningEffort?: string;
 }

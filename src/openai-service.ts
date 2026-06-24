@@ -177,6 +177,7 @@ export class OpenAIService {
     return {
       model: targetModel,
       messages: duckAIMessages,
+      reasoningEffort: request.reasoning_effort,
     };
   }
 
@@ -805,6 +806,7 @@ Please follow these instructions when responding to the following user message.`
       stop: request.stop,
       tools: request.tools,
       tool_choice: request.tool_choice,
+      reasoning_effort: request.reasoning_effort,
     };
   }
 

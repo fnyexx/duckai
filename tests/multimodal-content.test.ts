@@ -147,4 +147,16 @@ describe("Multimodal Content Support", () => {
     expect(completion.choices).toHaveLength(1);
     expect(completion.choices[0].message.content).toBe("Hello World");
   });
+
+  it("should support reasoning_effort option payload", async () => {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5.4-mini",
+      messages: [{ role: "user", content: "Say hello" }],
+      // Use standard OpenAI reasoning_effort field
+      reasoning_effort: "medium"
+    } as any);
+
+    expect(completion.object).toBe("chat.completion");
+    expect(completion.choices[0].message.content).toBe("Hello World");
+  });
 });
