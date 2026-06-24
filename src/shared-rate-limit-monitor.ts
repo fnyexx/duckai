@@ -12,7 +12,7 @@ export class SharedRateLimitMonitor {
   private monitoringInterval?: NodeJS.Timeout;
 
   // Rate limit constants (should match DuckAI class)
-  private readonly MAX_REQUESTS_PER_MINUTE = 20;
+  private readonly MAX_REQUESTS_PER_MINUTE = 40;
   private readonly WINDOW_SIZE_MS = 60 * 1000; // 1 minute
   private readonly MIN_REQUEST_INTERVAL_MS = 1000; // 1 second
 
