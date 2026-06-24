@@ -753,10 +753,14 @@ export class DuckAI {
         });
 
         const decoder = new TextDecoder();
+        let buffer = "";
         responseStream.on("data", (chunk: Buffer) => {
           if (isClosed) return;
-          const text = decoder.decode(chunk, { stream: true });
-          const lines = text.split("\n");
+          buffer += decoder.decode(chunk, { stream: true });
+          const lines = buffer.split("\n");
+          // Save the last incomplete line to buffer (will be empty if line ends with \n)
+          buffer = lines.pop() || "";
+
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               try {
@@ -772,6 +776,23 @@ export class DuckAI {
         });
 
         responseStream.on("end", () => {
+          // Flush the decoder and process any remaining buffer
+          buffer += decoder.decode();
+          if (buffer) {
+            const lines = buffer.split("\n");
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                try {
+                  const json = JSON.parse(line.slice(6));
+                  if (json.message && !isClosed) {
+                    controller.enqueue(json.message);
+                  }
+                } catch (e) {
+                  // Skip invalid JSON
+                }
+              }
+            }
+          }
           safeClose();
         });
 
