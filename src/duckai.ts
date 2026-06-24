@@ -497,8 +497,9 @@ export class DuckAI {
     const hashHeader = response.headers["x-vqd-hash-1"] as string;
 
     if (!hashHeader) {
+      const bodySnippet = response.body ? response.body.slice(0, 500) : "empty body";
       throw new Error(
-        `Missing VQD headers: hash=${!!hashHeader}`
+        `Missing x-vqd-hash-1 header. Status: ${response.statusCode}, Headers: ${JSON.stringify(response.headers)}, Body snippet: ${bodySnippet}`
       );
     }
 
