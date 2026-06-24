@@ -625,6 +625,13 @@ export class DuckAI {
           const json = JSON.parse(line.slice(6));
           if (json.message) {
             llmResponse += json.message;
+          } else if (
+            json.role === "ui-component" &&
+            json.data &&
+            json.data.b64Image
+          ) {
+            const format = json.data.format || "jpeg";
+            llmResponse += `\n\n![Generated Image](data:image/${format};base64,${json.data.b64Image})\n\n`;
           }
         } catch (e) {
           // Skip invalid JSON lines
@@ -768,6 +775,15 @@ export class DuckAI {
                 const json = JSON.parse(line.slice(6));
                 if (json.message && !isClosed) {
                   controller.enqueue(json.message);
+                } else if (
+                  json.role === "ui-component" &&
+                  json.data &&
+                  json.data.b64Image &&
+                  !isClosed
+                ) {
+                  const format = json.data.format || "jpeg";
+                  const imgMarkdown = `\n\n![Generated Image](data:image/${format};base64,${json.data.b64Image})\n\n`;
+                  controller.enqueue(imgMarkdown);
                 }
               } catch (e) {
                 // Skip invalid JSON
@@ -787,6 +803,15 @@ export class DuckAI {
                   const json = JSON.parse(line.slice(6));
                   if (json.message && !isClosed) {
                     controller.enqueue(json.message);
+                  } else if (
+                    json.role === "ui-component" &&
+                    json.data &&
+                    json.data.b64Image &&
+                    !isClosed
+                  ) {
+                    const format = json.data.format || "jpeg";
+                    const imgMarkdown = `\n\n![Generated Image](data:image/${format};base64,${json.data.b64Image})\n\n`;
+                    controller.enqueue(imgMarkdown);
                   }
                 } catch (e) {
                   // Skip invalid JSON
