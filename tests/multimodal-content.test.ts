@@ -110,4 +110,41 @@ describe("Multimodal Content Support", () => {
       expect(error.message).toContain("Text content parts must have a text field of type string");
     }
   });
+
+  it("should support file upload content parts and assistant parts payload", async () => {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5.4-mini",
+      messages: [
+        {
+          role: "assistant",
+          content: "你好。如果想继续排查，回复 1。",
+          parts: [
+            {
+              type: "reasoning",
+              id: "rs_01",
+              state: "done",
+              summaryText: ["Thinking..."]
+            }
+          ]
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Say hello" },
+            {
+              type: "file",
+              content: "base64data",
+              encoding: "base64",
+              mimeType: "application/pdf",
+              filename: "CLAUDE.pdf"
+            }
+          ]
+        }
+      ],
+    });
+
+    expect(completion.object).toBe("chat.completion");
+    expect(completion.choices).toHaveLength(1);
+    expect(completion.choices[0].message.content).toBe("Hello World");
+  });
 });

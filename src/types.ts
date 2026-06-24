@@ -12,7 +12,15 @@ export interface ImageUrlPart {
   };
 }
 
-export type ContentPart = TextPart | ImageUrlPart;
+export interface FilePart {
+  type: "file";
+  content: string;
+  encoding: "base64" | string;
+  mimeType: string;
+  filename: string;
+}
+
+export type ContentPart = TextPart | ImageUrlPart | FilePart;
 
 export interface ChatCompletionMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -20,6 +28,7 @@ export interface ChatCompletionMessage {
   name?: string;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
+  parts?: any[];
 }
 
 export interface FunctionDefinition {

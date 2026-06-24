@@ -83,8 +83,16 @@ export class OpenAIService {
     }
     if (Array.isArray(content)) {
       return content
-        .filter((part): part is TextPart => part.type === "text")
-        .map((part) => part.text)
+        .map((part) => {
+          if (part.type === "text") {
+            return part.text;
+          }
+          if (part.type === "file") {
+            return `[Uploaded File: ${part.filename} (Type: ${part.mimeType})]`;
+          }
+          return "";
+        })
+        .filter(Boolean)
         .join("\n");
     }
     return "";
@@ -747,7 +755,7 @@ Please follow these instructions when responding to the following user message.`
             if (!("type" in part)) {
               throw new Error("Each content part must have a type");
             }
-            if (part.type !== "text" && part.type !== "image_url") {
+            if (part.type !== "text" && part.type !== "image_url" && part.type !== "file") {
               throw new Error(`Unsupported content part type: ${part.type}`);
             }
             if (part.type === "text") {
@@ -761,6 +769,15 @@ Please follow these instructions when responding to the following user message.`
                 typeof part.image_url.url !== "string"
               ) {
                 throw new Error("Image content parts must have an image_url object with a url field");
+              }
+            } else if (part.type === "file") {
+              if (
+                typeof part.content !== "string" ||
+                typeof part.encoding !== "string" ||
+                typeof part.mimeType !== "string" ||
+                typeof part.filename !== "string"
+              ) {
+                throw new Error("File content parts must have content, encoding, mimeType, and filename as strings");
               }
             }
           }
