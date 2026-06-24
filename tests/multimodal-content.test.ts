@@ -130,13 +130,13 @@ describe("Multimodal Content Support", () => {
         {
           role: "user",
           content: [
-            { type: "text", text: "Say hello" },
+            { type: "text", text: "Some normal query" },
             {
               type: "file",
-              content: "base64data",
+              content: "U2F5IGhlbGxv", // Base64 encoding of "Say hello"
               encoding: "base64",
-              mimeType: "application/pdf",
-              filename: "CLAUDE.pdf"
+              mimeType: "text/plain",
+              filename: "hello.txt"
             }
           ]
         }

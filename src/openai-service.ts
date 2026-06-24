@@ -88,7 +88,18 @@ export class OpenAIService {
             return part.text;
           }
           if (part.type === "file") {
-            return `[Uploaded File: ${part.filename} (Type: ${part.mimeType})]`;
+            let fileContentText = "";
+            try {
+              if (part.encoding === "base64") {
+                // Decode Base64 encoded file content
+                fileContentText = Buffer.from(part.content, "base64").toString("utf-8");
+              } else {
+                fileContentText = part.content;
+              }
+            } catch (err) {
+              fileContentText = `[Error decoding file content: ${err instanceof Error ? err.message : String(err)}]`;
+            }
+            return `[Uploaded File: ${part.filename} (Type: ${part.mimeType})]\n--- START OF FILE CONTENT ---\n${fileContentText}\n--- END OF FILE CONTENT ---`;
           }
           return "";
         })
