@@ -1120,7 +1120,11 @@ Please follow these instructions when responding to the following user message.`
 
         const sendEvent = (eventName: string, data: any) => {
           const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
-          controller.enqueue(encoder.encode(payload));
+          try {
+            controller.enqueue(encoder.encode(payload));
+          } catch (e) {
+            // Ignore error if the client disconnected or controller is closed
+          }
         };
 
         const nowTimestamp = Math.floor(Date.now() / 1000);
@@ -1290,7 +1294,11 @@ Please follow these instructions when responding to the following user message.`
             response: failedPayload
           });
         } finally {
-          controller.close();
+          try {
+            controller.close();
+          } catch (e) {
+            // Ignore error if the controller is already closed
+          }
         }
       }
     });

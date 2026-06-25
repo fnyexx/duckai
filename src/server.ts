@@ -4,6 +4,7 @@ const openAIService = new OpenAIService();
 
 const server = Bun.serve({
   port: process.env.PORT || 3000,
+  idleTimeout: 60, // Set idleTimeout to 60 seconds to prevent 10s timeout errors on slow connections
   async fetch(req) {
     const url = new URL(req.url);
 
