@@ -66,6 +66,10 @@ const server = Bun.serve({
       // Responses API endpoint
       if (url.pathname === "/v1/responses" && req.method === "POST") {
         const body = await req.json();
+        // Write raw body to debug file to analyze incoming input_file structure
+        try {
+          await Bun.write("request-debug.json", JSON.stringify(body, null, 2));
+        } catch (e) {}
         const validatedRequest = openAIService.validateResponsesRequest(body);
 
         // Handle streaming
