@@ -133,10 +133,11 @@ export interface VQDResponse {
 
 export interface DuckAIMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
+  content: string | ContentPart[] | null;
   name?: string;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
+  parts?: any[];
 }
 
 export interface DuckAIRequest {

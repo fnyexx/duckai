@@ -154,8 +154,15 @@ export class OpenAIService {
 
       if (firstUserMsgIndex !== -1) {
         const userMsg = { ...processedMessages[firstUserMsgIndex] };
-        const userContent = this.extractTextFromContent(userMsg.content);
-        userMsg.content = `[System Instructions]\n${systemPrompt}\n\n${userContent}`;
+        if (Array.isArray(userMsg.content)) {
+          userMsg.content = [
+            { type: "text", text: `[System Instructions]\n${systemPrompt}\n\n` },
+            ...userMsg.content
+          ];
+        } else {
+          const userContent = this.extractTextFromContent(userMsg.content);
+          userMsg.content = `[System Instructions]\n${systemPrompt}\n\n${userContent}`;
+        }
         processedMessages[firstUserMsgIndex] = userMsg;
 
         // Filter out original system messages
@@ -177,13 +184,68 @@ export class OpenAIService {
       processedMessages = processedMessages.filter((m) => m.role !== "system");
     }
 
-    const duckAIMessages: DuckAIMessage[] = processedMessages.map((m) => ({
-      role: m.role,
-      content: this.extractTextFromContent(m.content),
-      name: m.name,
-      tool_calls: m.tool_calls,
-      tool_call_id: m.tool_call_id,
-    }));
+    const duckAIMessages: DuckAIMessage[] = processedMessages.map((m) => {
+      const msg: DuckAIMessage = {
+        role: m.role,
+        content: null,
+      };
+
+      if (Array.isArray(m.content)) {
+        msg.content = m.content.map((part) => {
+          if (part.type === "text") {
+            return {
+              type: "text",
+              text: part.text,
+            };
+          }
+          if (part.type === "file") {
+            return {
+              type: "file",
+              content: part.content,
+              encoding: part.encoding,
+              mimeType: part.mimeType,
+              filename: part.filename,
+            };
+          }
+          if (part.type === "image_url") {
+            const url = part.image_url.url;
+            if (url.startsWith("data:")) {
+              const match = url.match(/^data:([^;]+);base64,(.+)$/);
+              if (match) {
+                const mimeType = match[1];
+                const base64Data = match[2];
+                let ext = mimeType.split("/")[1] || "png";
+                if (ext.includes("+")) {
+                  ext = ext.split("+")[0];
+                }
+                return {
+                  type: "file",
+                  content: base64Data,
+                  encoding: "base64",
+                  mimeType: mimeType,
+                  filename: `image_${Date.now()}.${ext}`,
+                };
+              }
+            }
+            // Fallback for non-data URLs
+            return {
+              type: "text",
+              text: `[Image URL: ${url}]`,
+            };
+          }
+          return part;
+        }) as any;
+      } else {
+        msg.content = m.content;
+      }
+
+      if (m.name) msg.name = m.name;
+      if (m.tool_calls) msg.tool_calls = m.tool_calls;
+      if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+      if (m.parts) msg.parts = m.parts;
+
+      return msg;
+    });
 
     return {
       model: targetModel,
@@ -566,6 +628,7 @@ Please follow these instructions when responding to the following user message.`
 
     const id = completion.id;
     const created = completion.created;
+    const self = this;
 
     return new ReadableStream({
       start(controller) {
@@ -632,7 +695,7 @@ Please follow these instructions when responding to the following user message.`
           controller.enqueue(new TextEncoder().encode(finalDone));
         } else {
           // Stream regular content
-          const content = this.extractTextFromContent(choice.message.content);
+          const content = self.extractTextFromContent(choice.message.content);
 
           // Send role first
           const roleChunk: ChatCompletionStreamResponse = {

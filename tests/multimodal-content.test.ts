@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import OpenAI from "openai";
+import { OpenAIService } from "../src/openai-service";
 
 process.env.MOCK_DUCK_AI = "true";
 
@@ -158,5 +159,98 @@ describe("Multimodal Content Support", () => {
 
     expect(completion.object).toBe("chat.completion");
     expect(completion.choices[0].message.content).toBe("Hello World");
+  });
+
+  it("should transform image_url data URL to file part in transformToDuckAIRequest", () => {
+    const service = new OpenAIService();
+    const req = {
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user" as const,
+          content: [
+            { type: "text" as const, text: "Describe this image" },
+            {
+              type: "image_url" as const,
+              image_url: { url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" }
+            }
+          ]
+        }
+      ]
+    };
+    const transformed = (service as any).transformToDuckAIRequest(req);
+    expect(transformed.messages).toHaveLength(1);
+    const msg = transformed.messages[0];
+    expect(msg.role).toBe("user");
+    expect(Array.isArray(msg.content)).toBe(true);
+    expect(msg.content[0]).toEqual({ type: "text", text: "Describe this image" });
+    expect(msg.content[1].type).toBe("file");
+    expect(msg.content[1].encoding).toBe("base64");
+    expect(msg.content[1].mimeType).toBe("image/png");
+    expect(msg.content[1].content).toBe("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
+    expect(msg.content[1].filename).toContain("image_");
+  });
+
+  it("should prepend system instructions as a TextPart when first user message content is an array", () => {
+    const service = new OpenAIService();
+    const req = {
+      model: "gpt-4o",
+      messages: [
+        { role: "system" as const, content: "You are a helpful assistant." },
+        {
+          role: "user" as const,
+          content: [
+            { type: "text" as const, text: "Hello" }
+          ]
+        }
+      ]
+    };
+    const transformed = (service as any).transformToDuckAIRequest(req);
+    expect(transformed.messages).toHaveLength(1);
+    const msg = transformed.messages[0];
+    expect(msg.role).toBe("user");
+    expect(Array.isArray(msg.content)).toBe(true);
+    expect(msg.content[0]).toEqual({
+      type: "text",
+      text: "[System Instructions]\nYou are a helpful assistant.\n\n"
+    });
+    expect(msg.content[1]).toEqual({
+      type: "text",
+      text: "Hello"
+    });
+  });
+
+  it("should preserve assistant parts in transformToDuckAIRequest", () => {
+    const service = new OpenAIService();
+    const req = {
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "assistant" as const,
+          content: "Hello",
+          parts: [
+            {
+              type: "reasoning",
+              id: "rs_01",
+              state: "done",
+              summaryText: ["Thinking..."]
+            }
+          ]
+        }
+      ]
+    };
+    const transformed = (service as any).transformToDuckAIRequest(req);
+    expect(transformed.messages).toHaveLength(1);
+    const msg = transformed.messages[0];
+    expect(msg.role).toBe("assistant");
+    expect(msg.content).toBe("Hello");
+    expect(msg.parts).toEqual([
+      {
+        type: "reasoning",
+        id: "rs_01",
+        state: "done",
+        summaryText: ["Thinking..."]
+      }
+    ]);
   });
 });

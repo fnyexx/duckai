@@ -40,17 +40,54 @@ export class DuckAI {
     this.loadRateLimitFromStore();
   }
 
+  private extractTextFromContent(
+    content: string | any[] | null | undefined
+  ): string {
+    if (!content) {
+      return "";
+    }
+    if (typeof content === "string") {
+      return content;
+    }
+    if (Array.isArray(content)) {
+      return content
+        .map((part) => {
+          if (part.type === "text") {
+            return part.text;
+          }
+          if (part.type === "file") {
+            let fileContentText = "";
+            try {
+              if (part.encoding === "base64") {
+                fileContentText = Buffer.from(part.content, "base64").toString("utf-8");
+              } else {
+                fileContentText = part.content;
+              }
+            } catch (err) {
+              fileContentText = "";
+            }
+            return fileContentText;
+          }
+          return "";
+        })
+        .filter(Boolean)
+        .join("\n");
+    }
+    return "";
+  }
+
   /**
    * Helper to generate a simulated response from DuckAI for local testing
    */
   private async getMockResponse(request: DuckAIRequest): Promise<string> {
     const lastMessage = request.messages[request.messages.length - 1];
-    const userContent = lastMessage?.content || "";
+    const userContent = this.extractTextFromContent(lastMessage?.content);
 
     // Check if the request contains tool instructions (pushed as a system/user instruction prompt)
-    const systemPromptMessage = request.messages.find(
-      (m) => m.role === "user" && m.content?.includes("[SYSTEM INSTRUCTIONS]")
-    );
+    const systemPromptMessage = request.messages.find((m) => {
+      const text = this.extractTextFromContent(m.content);
+      return m.role === "user" && text.includes("[SYSTEM INSTRUCTIONS]");
+    });
     const hasToolsInstruction = !!systemPromptMessage;
 
     if (hasToolsInstruction) {
