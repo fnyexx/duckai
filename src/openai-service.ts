@@ -968,6 +968,7 @@ Please follow these instructions when responding to the following user message.`
                 return { ...part, type: "text" };
               }
               if (part.type === "input_file") {
+                console.log("[debug] RECEIVED INPUT_FILE:", JSON.stringify(part));
                 return { ...part, type: "file" };
               }
             }
