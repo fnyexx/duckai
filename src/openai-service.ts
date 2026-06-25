@@ -187,14 +187,14 @@ export class OpenAIService {
       processedMessages = processedMessages.filter((m) => m.role !== "system" && m.role !== "developer");
     }
 
-    const duckAIMessages: DuckAIMessage[] = processedMessages.map((m) => {
+    const duckAIMessages: DuckAIMessage[] = processedMessages.map((m, index) => {
       const msg: DuckAIMessage = {
         role: m.role,
         content: null,
       };
 
       if (Array.isArray(m.content)) {
-        msg.content = m.content.map((part) => {
+        const mappedParts = m.content.map((part) => {
           if (part.type === "text") {
             return {
               type: "text",
@@ -244,7 +244,23 @@ export class OpenAIService {
             };
           }
           return part;
-        }) as any;
+        });
+
+        const isLastMessage = index === processedMessages.length - 1;
+        const hasImage = mappedParts.some((part: any) => part && part.type === "image");
+
+        // Simplify to string only for historical messages or non-user messages to bypass WAF 400 limitations,
+        // while preserving array structures on the final user message for standard tests / tools.
+        const shouldSimplify = !hasImage && (!isLastMessage || m.role === "assistant");
+
+        if (shouldSimplify) {
+          msg.content = mappedParts
+            .map((part: any) => (part && part.type === "text" ? part.text : ""))
+            .filter(Boolean)
+            .join("\n");
+        } else {
+          msg.content = mappedParts as any;
+        }
       } else {
         msg.content = m.content;
       }
