@@ -62,6 +62,33 @@ const server = Bun.serve({
         });
       }
 
+      // Responses API endpoint
+      if (url.pathname === "/v1/responses" && req.method === "POST") {
+        const body = await req.json();
+        const validatedRequest = openAIService.validateResponsesRequest(body);
+
+        // Handle streaming
+        if (validatedRequest.stream) {
+          const stream =
+            await openAIService.createResponseStream(validatedRequest);
+          return new Response(stream, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              ...corsHeaders,
+            },
+          });
+        }
+
+        // Handle non-streaming
+        const responseObj =
+          await openAIService.createResponse(validatedRequest);
+        return new Response(JSON.stringify(responseObj), {
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+
       // 404 for unknown endpoints
       return new Response(
         JSON.stringify({
@@ -121,6 +148,9 @@ console.log(`  GET  /health - Health check`);
 console.log(`  GET  /v1/models - List available models`);
 console.log(
   `  POST /v1/chat/completions - Chat completions (streaming & non-streaming)`
+);
+console.log(
+  `  POST /v1/responses - OpenAI Responses API (streaming & non-streaming)`
 );
 console.log(`\n🔧 Example usage:`);
 console.log(

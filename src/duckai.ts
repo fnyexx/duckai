@@ -8,7 +8,7 @@ import type {
   VQDResponse,
   DuckAIRequest,
 } from "./types";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Buffer } from "node:buffer";
 
 // Rate limiting tracking with sliding window
@@ -593,11 +593,43 @@ export class DuckAI {
     };
     const feSignals = Buffer.from(JSON.stringify(mockSignalsObj)).toString("base64");
 
-    const chatBody = {
+    const conversationId = randomUUID();
+    const messageId = randomUUID();
+
+    const chatBody: any = {
       model: request.model,
+      metadata: {
+        customization: {
+          assistantRole: "Tech support specialist",
+          userRole: "Professional",
+          shouldSeekClarity: false,
+          additionalInstructions: ""
+        },
+        toolChoice: {
+          NewsSearch: false,
+          VideosSearch: false,
+          LocalSearch: false,
+          WeatherForecast: false
+        }
+      },
       messages: request.messages,
       canUseTools: true,
-      reasoningEffort: request.reasoningEffort || "none"
+      reasoningEffort: request.reasoningEffort || "none",
+      canUseApproxLocation: false,
+      canDelegateImageGeneration: null,
+      durableStream: {
+        messageId: messageId,
+        conversationId: conversationId,
+        publicKey: {
+          alg: "RSA-OAEP-256",
+          e: "AQAB",
+          ext: true,
+          key_ops: ["encrypt"],
+          kty: "RSA",
+          n: "vqcz0vTZm287wL-aVDXlqq4FuS_jRIk_Jjy_IHfMnl16gZYtpJDezxIwriE4RJMzuO49HXejpQ5i7gj0cHRSrjXTT28FGpIS_opERlvBLHlFmFKTTFFl513TMtGBvMWf-2CWrxBlRDHZOayzOlJeZWTtHatWX0zNUBxr9OoaVf5mPpcqw8sNI_xxMha_S7cE87yM8yVMpuK9ZvbRzQvliSXvUG507yqOY0ze-zR6OhPjQ1DPX2oRkrN2zoiNbdHRgmXCOwOUwtE0WHaoLFtxRDSBS_hOUBLCRTfLKYTrRsJvv9KHsE_2je0X1F416I3Jl51PrLaPbtdv86U0Do2W8w",
+          use: "enc"
+        }
+      }
     };
 
     const response = await gotScraping({
@@ -727,11 +759,43 @@ export class DuckAI {
     };
     const feSignals = Buffer.from(JSON.stringify(mockSignalsObj)).toString("base64");
 
-    const chatBody = {
+    const conversationId = randomUUID();
+    const messageId = randomUUID();
+
+    const chatBody: any = {
       model: request.model,
+      metadata: {
+        customization: {
+          assistantRole: "Tech support specialist",
+          userRole: "Professional",
+          shouldSeekClarity: false,
+          additionalInstructions: ""
+        },
+        toolChoice: {
+          NewsSearch: false,
+          VideosSearch: false,
+          LocalSearch: false,
+          WeatherForecast: false
+        }
+      },
       messages: request.messages,
       canUseTools: true,
-      reasoningEffort: request.reasoningEffort || "none"
+      reasoningEffort: request.reasoningEffort || "none",
+      canUseApproxLocation: false,
+      canDelegateImageGeneration: null,
+      durableStream: {
+        messageId: messageId,
+        conversationId: conversationId,
+        publicKey: {
+          alg: "RSA-OAEP-256",
+          e: "AQAB",
+          ext: true,
+          key_ops: ["encrypt"],
+          kty: "RSA",
+          n: "vqcz0vTZm287wL-aVDXlqq4FuS_jRIk_Jjy_IHfMnl16gZYtpJDezxIwriE4RJMzuO49HXejpQ5i7gj0cHRSrjXTT28FGpIS_opERlvBLHlFmFKTTFFl513TMtGBvMWf-2CWrxBlRDHZOayzOlJeZWTtHatWX0zNUBxr9OoaVf5mPpcqw8sNI_xxMha_S7cE87yM8yVMpuK9ZvbRzQvliSXvUG507yqOY0ze-zR6OhPjQ1DPX2oRkrN2zoiNbdHRgmXCOwOUwtE0WHaoLFtxRDSBS_hOUBLCRTfLKYTrRsJvv9KHsE_2je0X1F416I3Jl51PrLaPbtdv86U0Do2W8w",
+          use: "enc"
+        }
+      }
     };
 
     const responseStream = gotScraping.stream({

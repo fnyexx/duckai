@@ -20,7 +20,14 @@ export interface FilePart {
   filename: string;
 }
 
-export type ContentPart = TextPart | ImageUrlPart | FilePart;
+export interface FunctionCallPart {
+  type: "function_call";
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+export type ContentPart = TextPart | ImageUrlPart | FilePart | FunctionCallPart;
 
 export interface ChatCompletionMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -144,4 +151,40 @@ export interface DuckAIRequest {
   model: string;
   messages: DuckAIMessage[];
   reasoningEffort?: string;
+}
+
+// OpenAI Responses API Types
+export interface ResponseItem {
+  id: string;
+  object: "message";
+  role: "assistant" | "user" | "system" | "tool";
+  content: ContentPart[];
+}
+
+export interface ResponsesResponse {
+  id: string;
+  object: "response";
+  model: string;
+  status: "completed" | "failed" | "incomplete" | "in_progress";
+  output: ResponseItem[];
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export interface ResponsesRequest {
+  model: string;
+  input: ChatCompletionMessage[];
+  temperature?: number;
+  max_tokens?: number;
+  stream?: boolean;
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  stop?: string | string[];
+  tools?: ToolDefinition[];
+  tool_choice?: ToolChoice;
+  reasoning_effort?: "low" | "medium" | "high" | "none" | string;
 }

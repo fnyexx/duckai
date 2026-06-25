@@ -13,6 +13,9 @@ import type {
   TextPart,
   ToolDefinition,
   ToolCall,
+  ResponsesRequest,
+  ResponsesResponse,
+  ResponseItem,
 } from "./types";
 
 export class OpenAIService {
@@ -896,5 +899,255 @@ Please follow these instructions when responding to the following user message.`
    */
   getRateLimitStatus() {
     return this.duckAI.getRateLimitStatus();
+  }
+
+  validateResponsesRequest(request: any): ResponsesRequest {
+    if (!request.input || !Array.isArray(request.input)) {
+      throw new Error("input field is required and must be an array");
+    }
+
+    const fakeRequest = {
+      ...request,
+      messages: request.input,
+    };
+    const validatedFake = this.validateRequest(fakeRequest);
+
+    return {
+      model: validatedFake.model,
+      input: validatedFake.messages,
+      temperature: validatedFake.temperature,
+      max_tokens: validatedFake.max_tokens,
+      stream: validatedFake.stream,
+      top_p: validatedFake.top_p,
+      frequency_penalty: validatedFake.frequency_penalty,
+      presence_penalty: validatedFake.presence_penalty,
+      stop: validatedFake.stop,
+      tools: validatedFake.tools,
+      tool_choice: validatedFake.tool_choice,
+      reasoning_effort: validatedFake.reasoning_effort,
+    };
+  }
+
+  async createResponse(
+    request: ResponsesRequest
+  ): Promise<ResponsesResponse> {
+    const chatRequest: ChatCompletionRequest = {
+      model: request.model,
+      messages: request.input,
+      temperature: request.temperature,
+      max_tokens: request.max_tokens,
+      stream: false,
+      top_p: request.top_p,
+      frequency_penalty: request.frequency_penalty,
+      presence_penalty: request.presence_penalty,
+      stop: request.stop,
+      tools: request.tools,
+      tool_choice: request.tool_choice,
+      reasoning_effort: request.reasoning_effort,
+    };
+
+    const completion = await this.createChatCompletion(chatRequest);
+    const responseId = completion.id.replace("chatcmpl-", "resp_");
+    const output: ResponseItem[] = completion.choices.map((choice) => {
+      const msgId = `msg_${Math.random().toString(36).substring(2, 15)}`;
+
+      let contentParts: ContentPart[] = [];
+      if (choice.message.content === null) {
+        contentParts = [];
+      } else if (typeof choice.message.content === "string") {
+        contentParts = [{ type: "text", text: choice.message.content }];
+      } else if (Array.isArray(choice.message.content)) {
+        contentParts = choice.message.content;
+      }
+
+      if (choice.message.tool_calls) {
+        for (const tc of choice.message.tool_calls) {
+          contentParts.push({
+            type: "function_call",
+            id: tc.id,
+            name: tc.function.name,
+            arguments: tc.function.arguments,
+          });
+        }
+      }
+
+      return {
+        id: msgId,
+        object: "message" as const,
+        role: choice.message.role as any,
+        content: contentParts,
+      };
+    });
+
+    return {
+      id: responseId,
+      object: "response" as const,
+      model: completion.model,
+      status: "completed",
+      output,
+      usage: completion.usage,
+    };
+  }
+
+  async createResponseStream(
+    request: ResponsesRequest
+  ): Promise<ReadableStream<Uint8Array>> {
+    const chatRequest: ChatCompletionRequest = {
+      model: request.model,
+      messages: request.input,
+      temperature: request.temperature,
+      max_tokens: request.max_tokens,
+      stream: true,
+      top_p: request.top_p,
+      frequency_penalty: request.frequency_penalty,
+      presence_penalty: request.presence_penalty,
+      stop: request.stop,
+      tools: request.tools,
+      tool_choice: request.tool_choice,
+      reasoning_effort: request.reasoning_effort,
+    };
+
+    const chatStream = await this.createChatCompletionStream(chatRequest);
+    const responseId = `resp_${Math.random().toString(36).substring(2, 15)}`;
+    const assistantItemId = `msg_${Math.random().toString(36).substring(2, 15)}`;
+    const self = this;
+
+    return new ReadableStream({
+      async start(controller) {
+        const reader = chatStream.getReader();
+        const encoder = new TextEncoder();
+        let accumulatedContent = "";
+        let accumulatedToolCalls: ToolCall[] = [];
+
+        const sendEvent = (eventName: string, data: any) => {
+          const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+          controller.enqueue(encoder.encode(payload));
+        };
+
+        sendEvent("response.created", {
+          id: responseId,
+          object: "response",
+          model: request.model,
+          status: "in_progress",
+          output: []
+        });
+
+        sendEvent("response.output_item.added", {
+          response_id: responseId,
+          item: {
+            id: assistantItemId,
+            object: "message",
+            role: "assistant",
+            content: []
+          }
+        });
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const textChunk = new TextDecoder().decode(value);
+            const lines = textChunk.split("\n");
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const rawData = line.slice(6).trim();
+                if (rawData === "[DONE]") continue;
+
+                try {
+                  const chunkObj = JSON.parse(rawData);
+                  const deltaContent = chunkObj.choices?.[0]?.delta?.content;
+                  if (deltaContent) {
+                    accumulatedContent += deltaContent;
+
+                    sendEvent("response.output_item.delta", {
+                      response_id: responseId,
+                      item_id: assistantItemId,
+                      part_index: 0,
+                      delta: deltaContent
+                    });
+                  }
+
+                  const deltaToolCalls = chunkObj.choices?.[0]?.delta?.tool_calls;
+                  if (deltaToolCalls) {
+                    accumulatedToolCalls.push(...deltaToolCalls);
+                  }
+                } catch (e) {
+                  // Ignore JSON parse errors
+                }
+              }
+            }
+          }
+
+          let finalContentParts: ContentPart[] = [];
+          if (accumulatedContent) {
+            finalContentParts.push({
+              type: "text",
+              text: accumulatedContent
+            });
+          }
+          if (accumulatedToolCalls.length > 0) {
+            for (const tc of accumulatedToolCalls) {
+              finalContentParts.push({
+                type: "function_call",
+                id: tc.id,
+                name: tc.function.name,
+                arguments: tc.function.arguments
+              });
+            }
+          }
+
+          sendEvent("response.output_item.done", {
+            response_id: responseId,
+            item: {
+              id: assistantItemId,
+              object: "message",
+              role: "assistant",
+              content: finalContentParts
+            }
+          });
+
+          const promptText = request.input
+            .map((m) => self.extractTextFromContent(m.content))
+            .join(" ");
+          const promptTokens = self.estimateTokens(promptText);
+          const completionTokens = self.estimateTokens(accumulatedContent || JSON.stringify(accumulatedToolCalls));
+
+          sendEvent("response.done", {
+            id: responseId,
+            object: "response",
+            model: request.model,
+            status: "completed",
+            output: [
+              {
+                id: assistantItemId,
+                object: "message",
+                role: "assistant",
+                content: finalContentParts
+              }
+            ],
+            usage: {
+              prompt_tokens: promptTokens,
+              completion_tokens: completionTokens,
+              total_tokens: promptTokens + completionTokens
+            }
+          });
+        } catch (err) {
+          console.error("Responses stream error:", err);
+          sendEvent("response.done", {
+            id: responseId,
+            object: "response",
+            model: request.model,
+            status: "failed",
+            output: [],
+            error: {
+              message: err instanceof Error ? err.message : String(err)
+            }
+          });
+        } finally {
+          controller.close();
+        }
+      }
+    });
   }
 }
