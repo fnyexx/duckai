@@ -967,6 +967,9 @@ Please follow these instructions when responding to the following user message.`
               if (part.type === "input_text" || part.type === "output_text") {
                 return { ...part, type: "text" };
               }
+              if (part.type === "input_file") {
+                return { ...part, type: "file" };
+              }
             }
             return part;
           });

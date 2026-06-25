@@ -186,7 +186,19 @@ describe("OpenAI Responses API Endpoint (/v1/responses)", () => {
         {
           type: "message",
           role: "user",
-          content: "Hello"
+          content: [
+            {
+              type: "input_text",
+              text: "Hello"
+            },
+            {
+              type: "input_file",
+              content: "YmFzZTY0",
+              encoding: "base64",
+              mimeType: "text/plain",
+              filename: "test.txt"
+            }
+          ]
         },
         {
           type: "function_call_output",
@@ -202,9 +214,14 @@ describe("OpenAI Responses API Endpoint (/v1/responses)", () => {
     expect(validated.input[0].role).toBe("system");
     expect(validated.input[0].content).toBe("System prompt");
 
-    // User message should remain
+    // User message should remain and map content types
     expect(validated.input[1].role).toBe("user");
-    expect(validated.input[1].content).toBe("Hello");
+    expect(Array.isArray(validated.input[1].content)).toBe(true);
+    const content = validated.input[1].content as any[];
+    expect(content[0].type).toBe("text");
+    expect(content[0].text).toBe("Hello");
+    expect(content[1].type).toBe("file");
+    expect(content[1].filename).toBe("test.txt");
 
     // Function call output should map to tool
     expect(validated.input[2].role).toBe("tool");
