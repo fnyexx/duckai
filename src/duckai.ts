@@ -614,7 +614,7 @@ export class DuckAI {
       },
       messages: request.messages,
       canUseTools: true,
-      reasoningEffort: request.reasoningEffort || "none",
+      reasoningEffort: "none", // Force "none" since Duck.ai's free anonymous models (gpt-5.4-mini, claude-haiku-4-5) return 400 for other options
       canUseApproxLocation: false,
       canDelegateImageGeneration: null,
       durableStream: {
@@ -780,7 +780,7 @@ export class DuckAI {
       },
       messages: request.messages,
       canUseTools: true,
-      reasoningEffort: request.reasoningEffort || "none",
+      reasoningEffort: "none", // Force "none" since Duck.ai's free anonymous models (gpt-5.4-mini, claude-haiku-4-5) return 400 for other options
       canUseApproxLocation: false,
       canDelegateImageGeneration: null,
       durableStream: {

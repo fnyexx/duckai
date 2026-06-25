@@ -207,4 +207,84 @@ describe("OpenAI Responses API Endpoint (/v1/responses)", () => {
     expect(validated.input[2].tool_call_id).toBe("call_123");
     expect(validated.input[2].content).toBe("Function result");
   });
+
+  it("should handle user reported issue with input_text and output_text content types", async () => {
+    const requestBody = {
+      model: "gpt-5.4-mini",
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: "你是什么模型"
+            }
+          ]
+        },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "output_text",
+              text: "gpt-5.4-mini"
+            }
+          ],
+          id: "msg_123"
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: "你有什么技能"
+            }
+          ]
+        }
+      ],
+      stream: true
+    };
+
+    const response = await fetch(`${BASE_URL}/v1/responses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    expect(response.status).toBe(200);
+    const reader = response.body?.getReader();
+    expect(reader).toBeDefined();
+
+    const decoder = new TextDecoder();
+    let events: { event: string; data: any }[] = [];
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader!.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      let currentEvent = "";
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          const rawData = line.slice(6).trim();
+          try {
+            const dataObj = JSON.parse(rawData);
+            events.push({ event: currentEvent, data: dataObj });
+          } catch (e) {
+            // Ignore
+          }
+          currentEvent = "";
+        }
+      }
+    }
+
+    expect(events.length).toBeGreaterThanOrEqual(5);
+  });
 });
