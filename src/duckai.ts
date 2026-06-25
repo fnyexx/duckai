@@ -669,7 +669,7 @@ export class DuckAI {
 
     if (response.statusCode !== 200) {
       throw new Error(
-        `DuckAI API error: ${response.statusCode} ${response.statusMessage}`
+        `DuckAI API error: ${response.statusCode} ${response.statusMessage}. Body: ${response.body}`
       );
     }
 

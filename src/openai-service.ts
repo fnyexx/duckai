@@ -143,7 +143,7 @@ export class OpenAIService {
     }
 
     // 1. Extract all system messages and combine them
-    const systemMessages = request.messages.filter((m) => m.role === "system");
+    const systemMessages = request.messages.filter((m) => m.role === "system" || m.role === "developer");
     const systemPrompt = systemMessages
       .map((m) => this.extractTextFromContent(m.content))
       .filter(Boolean)
@@ -169,22 +169,22 @@ export class OpenAIService {
         processedMessages[firstUserMsgIndex] = userMsg;
 
         // Filter out original system messages
-        processedMessages = processedMessages.filter((m) => m.role !== "system");
+        processedMessages = processedMessages.filter((m) => m.role !== "system" && m.role !== "developer");
       } else {
         // No user messages found, convert first system message into a user message
-        const firstSystemMsgIndex = processedMessages.findIndex((m) => m.role === "system");
+        const firstSystemMsgIndex = processedMessages.findIndex((m) => m.role === "system" || m.role === "developer");
         if (firstSystemMsgIndex !== -1) {
           const firstSys = { ...processedMessages[firstSystemMsgIndex] };
           firstSys.role = "user" as const;
           firstSys.content = `[System Instructions]\n${systemPrompt}`;
 
-          processedMessages = processedMessages.filter((m, idx) => m.role !== "system" || idx === firstSystemMsgIndex);
+          processedMessages = processedMessages.filter((m, idx) => (m.role !== "system" && m.role !== "developer") || idx === firstSystemMsgIndex);
           processedMessages[0] = firstSys;
         }
       }
     } else {
       // Filter out system messages even if systemPrompt is empty
-      processedMessages = processedMessages.filter((m) => m.role !== "system");
+      processedMessages = processedMessages.filter((m) => m.role !== "system" && m.role !== "developer");
     }
 
     const duckAIMessages: DuckAIMessage[] = processedMessages.map((m) => {
@@ -797,10 +797,10 @@ Please follow these instructions when responding to the following user message.`
     for (const message of request.messages) {
       if (
         !message.role ||
-        !["system", "user", "assistant", "tool"].includes(message.role)
+        !["system", "user", "assistant", "tool", "developer"].includes(message.role)
       ) {
         throw new Error(
-          "Each message must have a valid role (system, user, assistant, or tool)"
+          "Each message must have a valid role (system, user, assistant, tool, or developer)"
         );
       }
 
@@ -906,9 +906,61 @@ Please follow these instructions when responding to the following user message.`
       throw new Error("input field is required and must be an array");
     }
 
+    const mappedMessages = request.input.map((item: any) => {
+      if (typeof item !== "object" || item === null) {
+        return item;
+      }
+
+      if (item.type === "function_call_output") {
+        return {
+          role: "tool",
+          tool_call_id: item.call_id,
+          content: item.output,
+        };
+      }
+
+      if (item.type === "message" || !item.type) {
+        let content = item.content;
+        let tool_calls: any[] = [];
+
+        if (Array.isArray(item.content)) {
+          const functionCalls = item.content.filter((part: any) => part && part.type === "function_call");
+          const otherParts = item.content.filter((part: any) => !part || part.type !== "function_call");
+
+          if (functionCalls.length > 0) {
+            tool_calls = functionCalls.map((fc: any) => ({
+              id: fc.id,
+              type: "function",
+              function: {
+                name: fc.name,
+                arguments: fc.arguments,
+              },
+            }));
+          }
+
+          if (otherParts.length > 0) {
+            content = otherParts;
+          } else {
+            content = null;
+          }
+        }
+
+        const msg: any = {
+          role: item.role === "developer" ? "system" : item.role,
+          content: content,
+        };
+        if (tool_calls.length > 0) {
+          msg.tool_calls = tool_calls;
+        }
+        return msg;
+      }
+
+      return item;
+    });
+
     const fakeRequest = {
       ...request,
-      messages: request.input,
+      messages: mappedMessages,
     };
     const validatedFake = this.validateRequest(fakeRequest);
 

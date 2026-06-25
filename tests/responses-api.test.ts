@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { OpenAIService } from "../src/openai-service";
 
 process.env.MOCK_DUCK_AI = "true";
 
@@ -166,5 +167,44 @@ describe("OpenAI Responses API Endpoint (/v1/responses)", () => {
     expect(response.status).toBe(400);
     const data = await response.json() as any;
     expect(data.error.message).toContain("input field is required");
+  });
+
+  it("should validate and map developer role and function_call_output in validateResponsesRequest", () => {
+    const service = new OpenAIService();
+    const req = {
+      model: "gpt-4o",
+      input: [
+        {
+          type: "message",
+          role: "developer",
+          content: "System prompt"
+        },
+        {
+          type: "message",
+          role: "user",
+          content: "Hello"
+        },
+        {
+          type: "function_call_output",
+          call_id: "call_123",
+          output: "Function result"
+        }
+      ]
+    };
+    const validated = service.validateResponsesRequest(req);
+    expect(validated.input).toHaveLength(3);
+
+    // Developer should map to system
+    expect(validated.input[0].role).toBe("system");
+    expect(validated.input[0].content).toBe("System prompt");
+
+    // User message should remain
+    expect(validated.input[1].role).toBe("user");
+    expect(validated.input[1].content).toBe("Hello");
+
+    // Function call output should map to tool
+    expect(validated.input[2].role).toBe("tool");
+    expect(validated.input[2].tool_call_id).toBe("call_123");
+    expect(validated.input[2].content).toBe("Function result");
   });
 });
