@@ -1082,9 +1082,14 @@ Please follow these instructions when responding to the following user message.`
       if (choice.message.content === null) {
         contentParts = [];
       } else if (typeof choice.message.content === "string") {
-        contentParts = [{ type: "text", text: choice.message.content }];
+        contentParts = [{ type: "output_text", text: choice.message.content } as any];
       } else if (Array.isArray(choice.message.content)) {
-        contentParts = choice.message.content;
+        contentParts = choice.message.content.map((part) => {
+          if (part && part.type === "text") {
+            return { ...part, type: "output_text" as any };
+          }
+          return part;
+        });
       }
 
       if (choice.message.tool_calls) {
@@ -1180,7 +1185,7 @@ Please follow these instructions when responding to the following user message.`
             role: "assistant",
             content: [
               {
-                type: "text",
+                type: "output_text",
                 text: ""
               }
             ]
@@ -1226,10 +1231,10 @@ Please follow these instructions when responding to the following user message.`
             }
           }
 
-          let finalContentParts: ContentPart[] = [];
+          let finalContentParts: any[] = [];
           if (accumulatedContent) {
             finalContentParts.push({
-              type: "text",
+              type: "output_text",
               text: accumulatedContent
             });
           }

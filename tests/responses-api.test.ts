@@ -52,7 +52,7 @@ describe("OpenAI Responses API Endpoint (/v1/responses)", () => {
     expect(data.output[0].object).toBe("message");
     expect(data.output[0].role).toBe("assistant");
     expect(Array.isArray(data.output[0].content)).toBe(true);
-    expect(data.output[0].content[0].type).toBe("text");
+    expect(data.output[0].content[0].type).toBe("output_text");
     expect(data.output[0].content[0].text).toBe("Hello World");
 
     expect(data.usage).toBeDefined();
