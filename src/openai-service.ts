@@ -1119,10 +1119,11 @@ Please follow these instructions when responding to the following user message.`
         let accumulatedToolCalls: ToolCall[] = [];
 
         const sendEvent = (eventName: string, data: any) => {
-          console.log(`[sendEvent debug] name=${eventName} data=`, JSON.stringify(data));
-          const payload = `data: ${JSON.stringify(data)}\n\n`;
+          const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
           controller.enqueue(encoder.encode(payload));
         };
+
+        const nowTimestamp = Math.floor(Date.now() / 1000);
 
         sendEvent("response.created", {
           type: "response.created",
@@ -1131,6 +1132,7 @@ Please follow these instructions when responding to the following user message.`
             object: "response",
             model: request.model,
             status: "in_progress",
+            created_at: nowTimestamp,
             output: []
           }
         });
@@ -1142,6 +1144,7 @@ Please follow these instructions when responding to the following user message.`
           item: {
             id: assistantItemId,
             object: "message",
+            type: "message",
             role: "assistant",
             content: [
               {
@@ -1216,6 +1219,7 @@ Please follow these instructions when responding to the following user message.`
             item: {
               id: assistantItemId,
               object: "message",
+              type: "message",
               role: "assistant",
               content: finalContentParts
             }
@@ -1227,42 +1231,63 @@ Please follow these instructions when responding to the following user message.`
           const promptTokens = self.estimateTokens(promptText);
           const completionTokens = self.estimateTokens(accumulatedContent || JSON.stringify(accumulatedToolCalls));
 
+          const responsePayload = {
+            id: responseId,
+            object: "response",
+            model: request.model,
+            status: "completed",
+            created_at: Math.floor(Date.now() / 1000),
+            output: [
+              {
+                id: assistantItemId,
+                object: "message",
+                type: "message",
+                role: "assistant",
+                content: finalContentParts
+              }
+            ],
+            usage: {
+              prompt_tokens: promptTokens,
+              completion_tokens: completionTokens,
+              total_tokens: promptTokens + completionTokens,
+              input_tokens: promptTokens,
+              output_tokens: completionTokens
+            }
+          };
+
+          // Send both response.done and response.completed for maximum client compatibility (Vercel AI SDK vs others)
           sendEvent("response.done", {
             type: "response.done",
-            response: {
-              id: responseId,
-              object: "response",
-              model: request.model,
-              status: "completed",
-              output: [
-                {
-                  id: assistantItemId,
-                  object: "message",
-                  role: "assistant",
-                  content: finalContentParts
-                }
-              ],
-              usage: {
-                prompt_tokens: promptTokens,
-                completion_tokens: completionTokens,
-                total_tokens: promptTokens + completionTokens
-              }
-            }
+            response: responsePayload
+          });
+
+          sendEvent("response.completed", {
+            type: "response.completed",
+            response: responsePayload
           });
         } catch (err) {
           console.error("Responses stream error:", err);
+
+          const failedPayload = {
+            id: responseId,
+            object: "response",
+            model: request.model,
+            status: "failed",
+            created_at: Math.floor(Date.now() / 1000),
+            output: [],
+            error: {
+              message: err instanceof Error ? err.message : String(err)
+            }
+          };
+
           sendEvent("response.done", {
             type: "response.done",
-            response: {
-              id: responseId,
-              object: "response",
-              model: request.model,
-              status: "failed",
-              output: [],
-              error: {
-                message: err instanceof Error ? err.message : String(err)
-              }
-            }
+            response: failedPayload
+          });
+
+          sendEvent("response.failed", {
+            type: "response.failed",
+            response: failedPayload
           });
         } finally {
           controller.close();
