@@ -1212,10 +1212,9 @@ Please follow these instructions when responding to the following user message.`
 
                     sendEvent("response.output_text.delta", {
                       type: "response.output_text.delta",
-                      response_id: responseId,
                       item_id: assistantItemId,
                       output_index: 0,
-                      part_index: 0,
+                      content_index: 0,
                       delta: deltaContent
                     });
                   }

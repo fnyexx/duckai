@@ -136,7 +136,7 @@ describe("OpenAI Responses API Endpoint (/v1/responses)", () => {
     for (const d of deltaEvents) {
       reassembledText += d.data.delta;
       expect(d.data.output_index).toBe(0);
-      expect(d.data.part_index).toBe(0);
+      expect(d.data.content_index).toBe(0);
     }
     expect(reassembledText).toBe("Hello World");
 
