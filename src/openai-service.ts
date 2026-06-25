@@ -968,8 +968,32 @@ Please follow these instructions when responding to the following user message.`
                 return { ...part, type: "text" };
               }
               if (part.type === "input_file") {
-                console.log("[debug] RECEIVED INPUT_FILE:", JSON.stringify(part));
-                return { ...part, type: "file" };
+                let content = "";
+                let encoding = "utf-8";
+                let mimeType = "text/plain";
+
+                if (part.file_data && typeof part.file_data === "string") {
+                  if (part.file_data.startsWith("data:")) {
+                    const match = part.file_data.match(/^data:([^;]+);base64,(.+)$/);
+                    if (match) {
+                      mimeType = match[1];
+                      encoding = "base64";
+                      content = match[2];
+                    } else {
+                      content = part.file_data;
+                    }
+                  } else {
+                    content = part.file_data;
+                  }
+                }
+
+                return {
+                  type: "file",
+                  content: content,
+                  encoding: encoding,
+                  mimeType: mimeType,
+                  filename: part.filename || "file.bin"
+                };
               }
             }
             return part;
