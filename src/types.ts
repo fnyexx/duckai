@@ -20,6 +20,12 @@ export interface FilePart {
   filename: string;
 }
 
+export interface ImagePart {
+  type: "image";
+  mimeType: string;
+  image: string;
+}
+
 export interface FunctionCallPart {
   type: "function_call";
   id: string;
@@ -27,7 +33,7 @@ export interface FunctionCallPart {
   arguments: string;
 }
 
-export type ContentPart = TextPart | ImageUrlPart | FilePart | FunctionCallPart;
+export type ContentPart = TextPart | ImageUrlPart | FilePart | FunctionCallPart | ImagePart;
 
 export interface ChatCompletionMessage {
   role: "system" | "user" | "assistant" | "tool";

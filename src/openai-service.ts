@@ -216,17 +216,10 @@ export class OpenAIService {
               const match = url.match(/^data:([^;]+);base64,(.+)$/);
               if (match) {
                 const mimeType = match[1];
-                const base64Data = match[2];
-                let ext = mimeType.split("/")[1] || "png";
-                if (ext.includes("+")) {
-                  ext = ext.split("+")[0];
-                }
                 return {
-                  type: "file",
-                  content: base64Data,
-                  encoding: "base64",
+                  type: "image",
                   mimeType: mimeType,
-                  filename: `image_${Date.now()}.${ext}`,
+                  image: url,
                 };
               }
             }
@@ -234,6 +227,13 @@ export class OpenAIService {
             return {
               type: "text",
               text: `[Image URL: ${url}]`,
+            };
+          }
+          if (part.type === "image") {
+            return {
+              type: "image",
+              mimeType: part.mimeType,
+              image: part.image,
             };
           }
           return part;
@@ -833,7 +833,7 @@ Please follow these instructions when responding to the following user message.`
             if (!("type" in part)) {
               throw new Error("Each content part must have a type");
             }
-            if (part.type !== "text" && part.type !== "image_url" && part.type !== "file") {
+            if (part.type !== "text" && part.type !== "image_url" && part.type !== "file" && part.type !== "image") {
               throw new Error(`Unsupported content part type: ${part.type}`);
             }
             if (part.type === "text") {
@@ -856,6 +856,13 @@ Please follow these instructions when responding to the following user message.`
                 typeof part.filename !== "string"
               ) {
                 throw new Error("File content parts must have content, encoding, mimeType, and filename as strings");
+              }
+            } else if (part.type === "image") {
+              if (
+                typeof part.image !== "string" ||
+                typeof part.mimeType !== "string"
+              ) {
+                throw new Error("Image content parts must have image and mimeType as strings");
               }
             }
           }

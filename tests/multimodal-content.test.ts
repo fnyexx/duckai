@@ -161,7 +161,7 @@ describe("Multimodal Content Support", () => {
     expect(completion.choices[0].message.content).toBe("Hello World");
   });
 
-  it("should transform image_url data URL to file part in transformToDuckAIRequest", () => {
+  it("should transform image_url data URL to image part in transformToDuckAIRequest", () => {
     const service = new OpenAIService();
     const req = {
       model: "gpt-4o",
@@ -184,11 +184,9 @@ describe("Multimodal Content Support", () => {
     expect(msg.role).toBe("user");
     expect(Array.isArray(msg.content)).toBe(true);
     expect(msg.content[0]).toEqual({ type: "text", text: "Describe this image" });
-    expect(msg.content[1].type).toBe("file");
-    expect(msg.content[1].encoding).toBe("base64");
+    expect(msg.content[1].type).toBe("image");
     expect(msg.content[1].mimeType).toBe("image/png");
-    expect(msg.content[1].content).toBe("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
-    expect(msg.content[1].filename).toContain("image_");
+    expect(msg.content[1].image).toBe("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
   });
 
   it("should prepend system instructions as a TextPart when first user message content is an array", () => {
