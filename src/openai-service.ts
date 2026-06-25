@@ -1124,15 +1124,20 @@ Please follow these instructions when responding to the following user message.`
         };
 
         sendEvent("response.created", {
-          id: responseId,
-          object: "response",
-          model: request.model,
-          status: "in_progress",
-          output: []
+          type: "response.created",
+          response: {
+            id: responseId,
+            object: "response",
+            model: request.model,
+            status: "in_progress",
+            output: []
+          }
         });
 
         sendEvent("response.output_item.added", {
+          type: "response.output_item.added",
           response_id: responseId,
+          output_index: 0,
           item: {
             id: assistantItemId,
             object: "message",
@@ -1159,9 +1164,11 @@ Please follow these instructions when responding to the following user message.`
                   if (deltaContent) {
                     accumulatedContent += deltaContent;
 
-                    sendEvent("response.output_item.delta", {
+                    sendEvent("response.output_text.delta", {
+                      type: "response.output_text.delta",
                       response_id: responseId,
                       item_id: assistantItemId,
+                      output_index: 0,
                       part_index: 0,
                       delta: deltaContent
                     });
@@ -1197,7 +1204,9 @@ Please follow these instructions when responding to the following user message.`
           }
 
           sendEvent("response.output_item.done", {
+            type: "response.output_item.done",
             response_id: responseId,
+            output_index: 0,
             item: {
               id: assistantItemId,
               object: "message",
@@ -1213,34 +1222,40 @@ Please follow these instructions when responding to the following user message.`
           const completionTokens = self.estimateTokens(accumulatedContent || JSON.stringify(accumulatedToolCalls));
 
           sendEvent("response.done", {
-            id: responseId,
-            object: "response",
-            model: request.model,
-            status: "completed",
-            output: [
-              {
-                id: assistantItemId,
-                object: "message",
-                role: "assistant",
-                content: finalContentParts
+            type: "response.done",
+            response: {
+              id: responseId,
+              object: "response",
+              model: request.model,
+              status: "completed",
+              output: [
+                {
+                  id: assistantItemId,
+                  object: "message",
+                  role: "assistant",
+                  content: finalContentParts
+                }
+              ],
+              usage: {
+                prompt_tokens: promptTokens,
+                completion_tokens: completionTokens,
+                total_tokens: promptTokens + completionTokens
               }
-            ],
-            usage: {
-              prompt_tokens: promptTokens,
-              completion_tokens: completionTokens,
-              total_tokens: promptTokens + completionTokens
             }
           });
         } catch (err) {
           console.error("Responses stream error:", err);
           sendEvent("response.done", {
-            id: responseId,
-            object: "response",
-            model: request.model,
-            status: "failed",
-            output: [],
-            error: {
-              message: err instanceof Error ? err.message : String(err)
+            type: "response.done",
+            response: {
+              id: responseId,
+              object: "response",
+              model: request.model,
+              status: "failed",
+              output: [],
+              error: {
+                message: err instanceof Error ? err.message : String(err)
+              }
             }
           });
         } finally {

@@ -119,21 +119,24 @@ describe("OpenAI Responses API Endpoint (/v1/responses)", () => {
     // Event 1: response.created
     const createdEvent = events.find(e => e.event === "response.created");
     expect(createdEvent).toBeDefined();
-    expect(createdEvent!.data.object).toBe("response");
-    expect(createdEvent!.data.status).toBe("in_progress");
+    expect(createdEvent!.data.response.object).toBe("response");
+    expect(createdEvent!.data.response.status).toBe("in_progress");
 
     // Event 2: response.output_item.added
     const addedEvent = events.find(e => e.event === "response.output_item.added");
     expect(addedEvent).toBeDefined();
     expect(addedEvent!.data.item.object).toBe("message");
     expect(addedEvent!.data.item.role).toBe("assistant");
+    expect(addedEvent!.data.output_index).toBe(0);
 
-    // Event 3: response.output_item.delta
-    const deltaEvents = events.filter(e => e.event === "response.output_item.delta");
+    // Event 3: response.output_text.delta
+    const deltaEvents = events.filter(e => e.event === "response.output_text.delta");
     expect(deltaEvents.length).toBeGreaterThan(0);
     let reassembledText = "";
     for (const d of deltaEvents) {
       reassembledText += d.data.delta;
+      expect(d.data.output_index).toBe(0);
+      expect(d.data.part_index).toBe(0);
     }
     expect(reassembledText).toBe("Hello World");
 
@@ -141,14 +144,15 @@ describe("OpenAI Responses API Endpoint (/v1/responses)", () => {
     const itemDoneEvent = events.find(e => e.event === "response.output_item.done");
     expect(itemDoneEvent).toBeDefined();
     expect(itemDoneEvent!.data.item.content[0].text).toBe("Hello World");
+    expect(itemDoneEvent!.data.output_index).toBe(0);
 
     // Event 5: response.done
     const doneEvent = events.find(e => e.event === "response.done");
     expect(doneEvent).toBeDefined();
-    expect(doneEvent!.data.status).toBe("completed");
-    expect(doneEvent!.data.output[0].content[0].text).toBe("Hello World");
-    expect(doneEvent!.data.usage).toBeDefined();
-    expect(doneEvent!.data.usage.total_tokens).toBeGreaterThan(0);
+    expect(doneEvent!.data.response.status).toBe("completed");
+    expect(doneEvent!.data.response.output[0].content[0].text).toBe("Hello World");
+    expect(doneEvent!.data.response.usage).toBeDefined();
+    expect(doneEvent!.data.response.usage.total_tokens).toBeGreaterThan(0);
   });
 
   it("should fail validation if input field is missing", async () => {
