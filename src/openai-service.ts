@@ -202,19 +202,43 @@ export class OpenAIService {
             };
           }
           if (part.type === "file") {
+            let content = part.content;
+            let encoding = part.encoding || "utf-8";
+            let mimeType = part.mimeType || "text/plain";
+            let filename = part.filename || "file.bin";
+
+            if (part.file && typeof part.file === "object") {
+              filename = part.file.filename || filename;
+              const fileData = part.file.file_data;
+              if (typeof fileData === "string") {
+                if (fileData.startsWith("data:")) {
+                  const match = fileData.match(/^data:([^;]+);base64,(.+)$/);
+                  if (match) {
+                    mimeType = match[1];
+                    encoding = "base64";
+                    content = match[2];
+                  } else {
+                    content = fileData;
+                  }
+                } else {
+                  content = fileData;
+                }
+              }
+            }
+
             let fileContentText = "";
             try {
-              if (part.encoding === "base64") {
-                fileContentText = Buffer.from(part.content, "base64").toString("utf-8");
+              if (encoding === "base64" && typeof content === "string") {
+                fileContentText = Buffer.from(content, "base64").toString("utf-8");
               } else {
-                fileContentText = part.content;
+                fileContentText = content || "";
               }
             } catch (err) {
               fileContentText = `[Error decoding file content: ${err instanceof Error ? err.message : String(err)}]`;
             }
             return {
               type: "text",
-              text: `[Uploaded File: ${part.filename} (Type: ${part.mimeType})]\n--- START OF FILE CONTENT ---\n${fileContentText}\n--- END OF FILE CONTENT ---`,
+              text: `[Uploaded File: ${filename} (Type: ${mimeType})]\n--- START OF FILE CONTENT ---\n${fileContentText}\n--- END OF FILE CONTENT ---`,
             };
           }
           if (part.type === "image_url") {
@@ -880,13 +904,21 @@ Please follow these instructions when responding to the following user message.`
                 throw new Error("Image content parts must have an image_url object with a url field");
               }
             } else if (part.type === "file") {
-              if (
-                typeof part.content !== "string" ||
-                typeof part.encoding !== "string" ||
-                typeof part.mimeType !== "string" ||
-                typeof part.filename !== "string"
-              ) {
-                throw new Error("File content parts must have content, encoding, mimeType, and filename as strings");
+              const hasFlatStructure =
+                typeof part.content === "string" &&
+                typeof part.encoding === "string" &&
+                typeof part.mimeType === "string" &&
+                typeof part.filename === "string";
+              const hasNestedStructure =
+                part.file &&
+                typeof part.file === "object" &&
+                typeof part.file.filename === "string" &&
+                typeof part.file.file_data === "string";
+
+              if (!hasFlatStructure && !hasNestedStructure) {
+                throw new Error(
+                  "File content parts must either have content, encoding, mimeType, and filename as strings, or a nested file object with filename and file_data as strings"
+                );
               }
             } else if (part.type === "image") {
               if (

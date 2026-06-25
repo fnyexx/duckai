@@ -251,4 +251,60 @@ describe("Multimodal Content Support", () => {
       }
     ]);
   });
+
+  it("should support nested file object content parts in chat completions", async () => {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5.4-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Process this file:" },
+            {
+              type: "file",
+              file: {
+                filename: "nested-file.txt",
+                file_data: "data:text/plain;base64,SGVsbG8gRnJvbSBOZXN0ZWQgRmlsZQ==" // "Hello From Nested File"
+              }
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(completion.object).toBe("chat.completion");
+    expect(completion.choices).toHaveLength(1);
+    expect(completion.choices[0].message.content).toBe("This is a mock response from DuckAI server. Testing was successful!");
+  });
+
+  it("should transform nested file object correctly in transformToDuckAIRequest", () => {
+    const service = new OpenAIService();
+    const req = {
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user" as const,
+          content: [
+            { type: "text" as const, text: "Process this" },
+            {
+              type: "file" as const,
+              file: {
+                filename: "document.txt",
+                file_data: "data:text/plain;base64,aGVsbG8gd29ybGQ=" // "hello world"
+              }
+            }
+          ]
+        }
+      ]
+    };
+    const transformed = (service as any).transformToDuckAIRequest(req);
+    expect(transformed.messages).toHaveLength(1);
+    const msg = transformed.messages[0];
+    expect(msg.role).toBe("user");
+    expect(Array.isArray(msg.content)).toBe(true);
+    expect(msg.content[0]).toEqual({ type: "text", text: "Process this" });
+    expect(msg.content[1].type).toBe("text");
+    expect(msg.content[1].text).toContain("[Uploaded File: document.txt (Type: text/plain)]");
+    expect(msg.content[1].text).toContain("hello world");
+  });
 });
