@@ -1119,7 +1119,8 @@ Please follow these instructions when responding to the following user message.`
         let accumulatedToolCalls: ToolCall[] = [];
 
         const sendEvent = (eventName: string, data: any) => {
-          const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+          console.log(`[sendEvent debug] name=${eventName} data=`, JSON.stringify(data));
+          const payload = `data: ${JSON.stringify(data)}\n\n`;
           controller.enqueue(encoder.encode(payload));
         };
 
