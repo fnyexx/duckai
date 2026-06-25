@@ -1142,7 +1142,12 @@ Please follow these instructions when responding to the following user message.`
             id: assistantItemId,
             object: "message",
             role: "assistant",
-            content: []
+            content: [
+              {
+                type: "text",
+                text: ""
+              }
+            ]
           }
         });
 
