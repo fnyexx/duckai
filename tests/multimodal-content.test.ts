@@ -112,7 +112,7 @@ describe("Multimodal Content Support", () => {
     }
   });
 
-  it("should fail validation with non-PNG image data URLs", async () => {
+  it("should fail validation with unsupported image data URLs", async () => {
     try {
       await openai.chat.completions.create({
         model: "gpt-5.4-mini",
@@ -128,8 +128,27 @@ describe("Multimodal Content Support", () => {
       expect(true).toBe(false);
     } catch (error: any) {
       expect(error.status).toBe(400);
-      expect(error.message).toContain("Only PNG images (image/png) are supported");
+      expect(error.message).toContain("Only PNG (image/png) and WebP (image/webp) images are supported");
     }
+  });
+
+  it("should support WebP images in content parts", async () => {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5.4-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Describe this image" },
+            { type: "image_url", image_url: { url: "data:image/webp;base64,UklGRh5hAABXRUJQVlA4WAoAAAAgAAAA/wEAHwEASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggMF8AAPB/AZ0BKgACIAE+MRiaWkflVmr2HGX0ojfhgvsh30AelKr7dva4IBuxm8TcoX4EU2i+V9qfPHjBt85/+VS9qoNwUOJyfxYKIIkOzyE1nFQWRLGzFJAAAA" } }
+          ]
+        }
+      ],
+    });
+
+    expect(completion.object).toBe("chat.completion");
+    expect(completion.choices).toHaveLength(1);
+    expect(completion.choices[0].message.content).toBe("Hello World");
   });
 
   it("should support file upload content parts and assistant parts payload", async () => {

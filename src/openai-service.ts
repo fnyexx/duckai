@@ -908,8 +908,8 @@ Please follow these instructions when responding to the following user message.`
                 const match = url.match(/^data:([^;]+);base64,(.+)$/);
                 if (match) {
                   const mimeType = match[1];
-                  if (mimeType !== "image/png") {
-                    throw new Error(`Only PNG images (image/png) are supported by the Duck.ai backend. Received unsupported format: ${mimeType}`);
+                  if (mimeType !== "image/png" && mimeType !== "image/webp") {
+                    throw new Error(`Only PNG (image/png) and WebP (image/webp) images are supported by the Duck.ai backend. Received unsupported format: ${mimeType}`);
                   }
                 }
               }
@@ -937,8 +937,8 @@ Please follow these instructions when responding to the following user message.`
               ) {
                 throw new Error("Image content parts must have image and mimeType as strings");
               }
-              if (part.mimeType !== "image/png") {
-                throw new Error(`Only PNG images (image/png) are supported by the Duck.ai backend. Received unsupported format: ${part.mimeType}`);
+              if (part.mimeType !== "image/png" && part.mimeType !== "image/webp") {
+                throw new Error(`Only PNG (image/png) and WebP (image/webp) images are supported by the Duck.ai backend. Received unsupported format: ${part.mimeType}`);
               }
             }
           }
