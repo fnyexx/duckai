@@ -903,6 +903,16 @@ Please follow these instructions when responding to the following user message.`
               ) {
                 throw new Error("Image content parts must have an image_url object with a url field");
               }
+              const url = part.image_url.url;
+              if (url.startsWith("data:")) {
+                const match = url.match(/^data:([^;]+);base64,(.+)$/);
+                if (match) {
+                  const mimeType = match[1];
+                  if (mimeType !== "image/png") {
+                    throw new Error(`Only PNG images (image/png) are supported by the Duck.ai backend. Received unsupported format: ${mimeType}`);
+                  }
+                }
+              }
             } else if (part.type === "file") {
               const hasFlatStructure =
                 typeof part.content === "string" &&
@@ -926,6 +936,9 @@ Please follow these instructions when responding to the following user message.`
                 typeof part.mimeType !== "string"
               ) {
                 throw new Error("Image content parts must have image and mimeType as strings");
+              }
+              if (part.mimeType !== "image/png") {
+                throw new Error(`Only PNG images (image/png) are supported by the Duck.ai backend. Received unsupported format: ${part.mimeType}`);
               }
             }
           }

@@ -112,6 +112,26 @@ describe("Multimodal Content Support", () => {
     }
   });
 
+  it("should fail validation with non-PNG image data URLs", async () => {
+    try {
+      await openai.chat.completions.create({
+        model: "gpt-5.4-mini",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: "data:image/jpeg;base64,iVBORw0KGgo=" } }
+            ]
+          }
+        ],
+      });
+      expect(true).toBe(false);
+    } catch (error: any) {
+      expect(error.status).toBe(400);
+      expect(error.message).toContain("Only PNG images (image/png) are supported");
+    }
+  });
+
   it("should support file upload content parts and assistant parts payload", async () => {
     const completion = await openai.chat.completions.create({
       model: "gpt-5.4-mini",
