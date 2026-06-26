@@ -112,9 +112,56 @@ export class OpenAIService {
     return "";
   }
 
-  private transformToDuckAIRequest(
+  private async preprocessMessages(messages: ChatCompletionMessage[]): Promise<ChatCompletionMessage[]> {
+    const pdf = require("pdf-parse");
+
+    return Promise.all(messages.map(async (m) => {
+      if (!Array.isArray(m.content)) {
+        return m;
+      }
+
+      const mappedContent = await Promise.all(m.content.map(async (part) => {
+        if (part.type === "file") {
+          const mimeType = part.mimeType || "";
+          const filename = part.filename || "";
+          const isPdf = mimeType === "application/pdf" || filename.toLowerCase().endsWith(".pdf");
+
+          if (isPdf) {
+            let fileContentText = "";
+            try {
+              let pdfBuffer: Buffer;
+              if (part.encoding === "base64" && typeof part.content === "string") {
+                pdfBuffer = Buffer.from(part.content, "base64");
+              } else if (part.file && typeof part.file === "object" && typeof part.file.file_data === "string") {
+                pdfBuffer = Buffer.from(part.file.file_data, "base64");
+              } else {
+                pdfBuffer = Buffer.from((part.content as string) || "", "utf-8");
+              }
+              const data = await pdf(pdfBuffer);
+              fileContentText = data.text || "";
+            } catch (err) {
+              fileContentText = `[Error parsing PDF file: ${err instanceof Error ? err.message : String(err)}]`;
+            }
+
+            return {
+              type: "text" as const,
+              text: `[Uploaded File: ${filename} (Type: ${mimeType})]\n--- START OF FILE CONTENT ---\n${fileContentText}\n--- END OF FILE CONTENT ---`
+            };
+          }
+        }
+        return part;
+      }));
+
+      return {
+        ...m,
+        content: mappedContent
+      };
+    }));
+  }
+
+  private async transformToDuckAIRequest(
     request: ChatCompletionRequest
-  ): DuckAIRequest {
+  ): Promise<DuckAIRequest> {
     const modelMap: Record<string, string> = {
       "gpt-4o": "gpt-5.4-mini",
       "gpt-4o-mini": "gpt-5.4-mini",
@@ -149,7 +196,7 @@ export class OpenAIService {
       .filter(Boolean)
       .join("\n");
 
-    let processedMessages = [...request.messages];
+    let processedMessages = await this.preprocessMessages(request.messages);
 
     if (systemPrompt) {
       // 2. Find the first user message to inject system instructions
@@ -322,7 +369,7 @@ export class OpenAIService {
       return this.createChatCompletionWithTools(request);
     }
 
-    const duckAIRequest = this.transformToDuckAIRequest(request);
+    const duckAIRequest = await this.transformToDuckAIRequest(request);
     const response = await this.duckAI.chat(duckAIRequest);
 
     const id = this.generateId();
@@ -387,7 +434,7 @@ Please follow these instructions when responding to the following user message.`
       });
     }
 
-    const duckAIRequest = this.transformToDuckAIRequest({
+    const duckAIRequest = await this.transformToDuckAIRequest({
       ...request,
       messages: modifiedMessages,
     });
@@ -576,7 +623,7 @@ Please follow these instructions when responding to the following user message.`
       return this.createChatCompletionStreamWithTools(request);
     }
 
-    const duckAIRequest = this.transformToDuckAIRequest(request);
+    const duckAIRequest = await this.transformToDuckAIRequest(request);
     const duckStream = await this.duckAI.chatStream(duckAIRequest);
 
     const id = this.generateId();

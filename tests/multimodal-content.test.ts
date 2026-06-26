@@ -188,6 +188,33 @@ describe("Multimodal Content Support", () => {
     expect(completion.choices[0].message.content).toBe("Hello World");
   });
 
+  it("should support PDF file upload and extract text successfully", async () => {
+    const pdfBase64 = "JVBERi0xLjQKMSAwIG9iagogIDw8IC9UeXBlIC9DYXRhbG9nCiAgICAgL1BhZ2VzIDIgMCBSCiAgPj4KZW5kb2JqCjIgMCBvYmoKICA8PCAvVHlwZSAvUGFnZXMKICAgICAvS2lkcyBbIDMgMCBSIF0KICAgICAvQ291bnQgMQogID4+CmVuZG9iagozIDAgb2JqCiAgPDwgL1R5cGUgL1BhZ2UKICAgICAvUGFyZW50IDIgMCBSCiAgICAgL01lZGlhQm94IFsgMCAwIDU5NSA4NDIgXQogICAgIC9Db250ZW50cyA0IDAgUgogID4+CmVuZG9iago0IDAgb2JqCiAgPDwgL1xlbmd0aCA1OSA+PgpzdHJlYW0KQlQKICAvRjEgMTIgVGYKICA3MiA3MTIgVGQKICAoRGVncmVlcz8gWWVzLCB0aGlzIGlzIGEgdGVzdCBQREYhKSBUagogRVQKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNQowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1NiAwMDAwMCBuIAowMDAwMDAwMTExIDAwMDAwIG4gCjAwMDAwMDAyMTIgMDAwMDAgbiAKdHJhaWxlcgowIDUKeHJlZgo8PCAvU2l6ZSA1IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgozMjIKJSVFT0YK";
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5.4-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Say hello" },
+            {
+              type: "file",
+              content: pdfBase64,
+              encoding: "base64",
+              mimeType: "application/pdf",
+              filename: "test.pdf"
+            }
+          ]
+        }
+      ],
+    });
+
+    expect(completion.object).toBe("chat.completion");
+    expect(completion.choices).toHaveLength(1);
+    expect(completion.choices[0].message.content).toBe("Hello World");
+  });
+
   it("should support reasoning_effort option payload", async () => {
     const completion = await openai.chat.completions.create({
       model: "gpt-5.4-mini",
@@ -200,7 +227,7 @@ describe("Multimodal Content Support", () => {
     expect(completion.choices[0].message.content).toBe("Hello World");
   });
 
-  it("should transform image_url data URL to image part in transformToDuckAIRequest", () => {
+  it("should transform image_url data URL to image part in transformToDuckAIRequest", async () => {
     const service = new OpenAIService();
     const req = {
       model: "gpt-4o",
@@ -217,7 +244,7 @@ describe("Multimodal Content Support", () => {
         }
       ]
     };
-    const transformed = (service as any).transformToDuckAIRequest(req);
+    const transformed = await (service as any).transformToDuckAIRequest(req);
     expect(transformed.messages).toHaveLength(1);
     const msg = transformed.messages[0];
     expect(msg.role).toBe("user");
@@ -228,7 +255,7 @@ describe("Multimodal Content Support", () => {
     expect(msg.content[1].image).toBe("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
   });
 
-  it("should prepend system instructions as a TextPart when first user message content is an array", () => {
+  it("should prepend system instructions as a TextPart when first user message content is an array", async () => {
     const service = new OpenAIService();
     const req = {
       model: "gpt-4o",
@@ -242,7 +269,7 @@ describe("Multimodal Content Support", () => {
         }
       ]
     };
-    const transformed = (service as any).transformToDuckAIRequest(req);
+    const transformed = await (service as any).transformToDuckAIRequest(req);
     expect(transformed.messages).toHaveLength(1);
     const msg = transformed.messages[0];
     expect(msg.role).toBe("user");
@@ -257,7 +284,7 @@ describe("Multimodal Content Support", () => {
     });
   });
 
-  it("should preserve assistant parts in transformToDuckAIRequest", () => {
+  it("should preserve assistant parts in transformToDuckAIRequest", async () => {
     const service = new OpenAIService();
     const req = {
       model: "gpt-4o",
@@ -276,7 +303,7 @@ describe("Multimodal Content Support", () => {
         }
       ]
     };
-    const transformed = (service as any).transformToDuckAIRequest(req);
+    const transformed = await (service as any).transformToDuckAIRequest(req);
     expect(transformed.messages).toHaveLength(1);
     const msg = transformed.messages[0];
     expect(msg.role).toBe("assistant");
@@ -316,7 +343,7 @@ describe("Multimodal Content Support", () => {
     expect(completion.choices[0].message.content).toBe("This is a mock response from DuckAI server. Testing was successful!");
   });
 
-  it("should transform nested file object correctly in transformToDuckAIRequest", () => {
+  it("should transform nested file object correctly in transformToDuckAIRequest", async () => {
     const service = new OpenAIService();
     const req = {
       model: "gpt-4o",
@@ -336,7 +363,7 @@ describe("Multimodal Content Support", () => {
         }
       ]
     };
-    const transformed = (service as any).transformToDuckAIRequest(req);
+    const transformed = await (service as any).transformToDuckAIRequest(req);
     expect(transformed.messages).toHaveLength(1);
     const msg = transformed.messages[0];
     expect(msg.role).toBe("user");
