@@ -999,6 +999,16 @@ Please follow these instructions when responding to the following user message.`
               if (part.type === "input_text" || part.type === "output_text") {
                 return { ...part, type: "text" };
               }
+              if (part.type === "input_image") {
+                let image_url = part.image_url;
+                if (typeof image_url === "string") {
+                  image_url = { url: image_url };
+                }
+                return {
+                  type: "image_url",
+                  image_url: image_url
+                };
+              }
               if (part.type === "input_file") {
                 let content = "";
                 let encoding = "utf-8";

@@ -308,4 +308,80 @@ describe("OpenAI Responses API Endpoint (/v1/responses)", () => {
 
     expect(events.length).toBeGreaterThanOrEqual(5);
   });
+
+  it("should validate and map input_image content type in validateResponsesRequest", () => {
+    const service = new OpenAIService();
+    const req = {
+      model: "gpt-4o",
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [
+            {
+              type: "input_image",
+              image_url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            },
+            {
+              type: "input_image",
+              image_url: {
+                url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+              }
+            }
+          ]
+        }
+      ]
+    };
+    const validated = service.validateResponsesRequest(req);
+    expect(validated.input).toHaveLength(1);
+    expect(Array.isArray(validated.input[0].content)).toBe(true);
+    const content = validated.input[0].content as any[];
+    expect(content).toHaveLength(2);
+
+    expect(content[0].type).toBe("image_url");
+    expect(content[0].image_url).toEqual({
+      url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    });
+
+    expect(content[1].type).toBe("image_url");
+    expect(content[1].image_url).toEqual({
+      url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    });
+  });
+
+  it("should handle request with input_image successfully via /v1/responses", async () => {
+    const requestBody = {
+      model: "gpt-5.4-mini",
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: "Describe this image"
+            },
+            {
+              type: "input_image",
+              image_url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            }
+          ]
+        }
+      ]
+    };
+
+    const response = await fetch(`${BASE_URL}/v1/responses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    expect(response.status).toBe(200);
+    const data = await response.json() as any;
+    expect(data.id).toContain("resp_");
+    expect(data.object).toBe("response");
+    expect(data.status).toBe("completed");
+    expect(data.output[0].content[0].type).toBe("output_text");
+  });
 });
