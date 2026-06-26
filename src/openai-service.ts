@@ -283,7 +283,12 @@ export class OpenAIService {
             .filter(Boolean)
             .join("\n");
         } else {
-          msg.content = mappedParts as any;
+          const hasTextFirst = mappedParts[0] && mappedParts[0].type === "text";
+          if (!hasTextFirst) {
+            msg.content = [{ type: "text", text: "" }, ...mappedParts] as any;
+          } else {
+            msg.content = mappedParts as any;
+          }
         }
       } else {
         msg.content = m.content;

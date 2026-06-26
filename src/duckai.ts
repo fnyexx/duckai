@@ -599,12 +599,6 @@ export class DuckAI {
     const chatBody: any = {
       model: request.model,
       metadata: {
-        customization: {
-          assistantRole: "Tech support specialist",
-          userRole: "Professional",
-          shouldSeekClarity: false,
-          additionalInstructions: ""
-        },
         toolChoice: {
           NewsSearch: false,
           VideosSearch: false,
@@ -615,7 +609,7 @@ export class DuckAI {
       messages: request.messages,
       canUseTools: true,
       reasoningEffort: "none", // Force "none" since Duck.ai's free anonymous models (gpt-5.4-mini, claude-haiku-4-5) return 400 for other options
-      canUseApproxLocation: false,
+      canUseApproxLocation: null,
       canDelegateImageGeneration: null,
       durableStream: {
         messageId: messageId,
@@ -765,12 +759,6 @@ export class DuckAI {
     const chatBody: any = {
       model: request.model,
       metadata: {
-        customization: {
-          assistantRole: "Tech support specialist",
-          userRole: "Professional",
-          shouldSeekClarity: false,
-          additionalInstructions: ""
-        },
         toolChoice: {
           NewsSearch: false,
           VideosSearch: false,
@@ -781,7 +769,7 @@ export class DuckAI {
       messages: request.messages,
       canUseTools: true,
       reasoningEffort: "none", // Force "none" since Duck.ai's free anonymous models (gpt-5.4-mini, claude-haiku-4-5) return 400 for other options
-      canUseApproxLocation: false,
+      canUseApproxLocation: null,
       canDelegateImageGeneration: null,
       durableStream: {
         messageId: messageId,
